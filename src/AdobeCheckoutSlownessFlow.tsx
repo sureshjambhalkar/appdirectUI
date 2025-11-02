@@ -21,7 +21,8 @@ import {
   Paper,
   ThemeIcon,
   Loader,
-  Anchor
+  Anchor,
+  Tabs
 } from '@mantine/core';
 import { 
   IconArrowLeft, 
@@ -37,13 +38,33 @@ import {
   IconPhone,
   IconCheck,
   IconAlertTriangle,
-  IconLoader
+  IconLoader,
+  IconBolt
 } from '@tabler/icons-react';
 
 const AdobeCheckoutSlownessFlow: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const errorRef = useRef<HTMLDivElement>(null);
+  
+  // Determine active tab from location
+  const getActiveTab = () => {
+    const path = location.pathname;
+    // Check for checkout specifically (not just containing '/checkout')
+    if (path === '/adobe-checkout-slowness/checkout' || path.endsWith('/checkout')) {
+      return 'checkout';
+    }
+    // Default to quotes for root path, /quotes, or anything else
+    return 'quotes';
+  };
+  const activeTab = getActiveTab();
+  
+  // Redirect root path to /quotes on mount if needed
+  useEffect(() => {
+    if (location.pathname === '/adobe-checkout-slowness' || location.pathname === '/adobe-checkout-slowness/') {
+      navigate('/adobe-checkout-slowness/quotes', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   return (
     <Box style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
@@ -90,17 +111,31 @@ const AdobeCheckoutSlownessFlow: React.FC = () => {
 
       {/* Main Content */}
       <Container size="xl" py="xl">
-        <Routes>
-          <Route path="/" element={<OpportunityPageContent errorRef={errorRef} />} />
-          <Route path="/dashboard" element={<OpportunityPageContent errorRef={errorRef} />} />
-        </Routes>
+        <Tabs value={activeTab} onChange={(value) => {
+          if (value === 'checkout') {
+            navigate('/adobe-checkout-slowness/checkout', { replace: true });
+          } else {
+            navigate('/adobe-checkout-slowness/quotes', { replace: true });
+          }
+        }}>
+          <Tabs.List mb="xl">
+            <Tabs.Tab value="quotes">Quotes</Tabs.Tab>
+            <Tabs.Tab value="checkout">Checkout</Tabs.Tab>
+          </Tabs.List>
+
+          <Routes>
+            <Route index element={<QuotesPageContent errorRef={errorRef} />} />
+            <Route path="quotes" element={<QuotesPageContent errorRef={errorRef} />} />
+            <Route path="checkout" element={<CheckoutPageContent errorRef={errorRef} />} />
+          </Routes>
+        </Tabs>
       </Container>
     </Box>
   );
 };
 
-// Opportunity Page Content Component
-const OpportunityPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }> = ({ errorRef }) => {
+// Quotes Page Content Component (moved from OpportunityPageContent)
+const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }> = ({ errorRef }) => {
   const [quantity, setQuantity] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [showError, setShowError] = useState(false);
@@ -605,6 +640,364 @@ const OpportunityPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElemen
         </Stack>
       </Grid.Col>
     </Grid>
+  );
+};
+
+// Checkout Page Content Component
+const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }> = ({ errorRef }) => {
+  const [inputQuantity, setInputQuantity] = useState<number | string>(10); // Input value (can be partial)
+  const [quantity, setQuantity] = useState(10); // Processed quantity
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showError, setShowError] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [lastAttemptedQuantity, setLastAttemptedQuantity] = useState<number | null>(null);
+  const [isNextDisabled, setIsNextDisabled] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasProcessedRef = useRef(false);
+
+  // Load last attempted quantity from localStorage on component mount
+  useEffect(() => {
+    const savedQuantity = localStorage.getItem('checkoutLastAttemptedQuantity');
+    if (savedQuantity) {
+      const parsedQuantity = parseInt(savedQuantity, 10);
+      setLastAttemptedQuantity(parsedQuantity);
+      // Don't pre-fill the quantity - let user enter it again
+      // This way when they type the same quantity, we can detect it's a retry
+    }
+  }, []);
+
+  // Pricing calculations based on quantity
+  const originalUnitPrice = 10.00;
+  const discountedUnitPrice = 7.50;
+  const yearlyPrice = quantity * discountedUnitPrice;
+  const subtotal = yearlyPrice * 0.948; // Approximate to match $71.10 for 10 users
+  const tax = subtotal * 0.05; // 5% tax
+  const dueNow = subtotal + tax;
+
+  // Debounced quantity processing - only processes after user stops typing
+  useEffect(() => {
+    // Clear any existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    const numValue = typeof inputQuantity === 'string' ? parseInt(inputQuantity, 10) : inputQuantity;
+    const finalQuantity = numValue || 10;
+
+    // If quantity hasn't changed from processed quantity, don't do anything
+    if (finalQuantity === quantity && hasProcessedRef.current) {
+      return;
+    }
+
+    // Debounce: wait 1 second after user stops typing before processing
+    debounceTimerRef.current = setTimeout(() => {
+      // Check if this is the retry of a failed quantity (same as lastAttemptedQuantity)
+      if (lastAttemptedQuantity !== null && finalQuantity === lastAttemptedQuantity) {
+        // Same quantity as last attempt - show success immediately
+        setShowSuccess(true);
+        setShowError(false);
+        setIsNextDisabled(false);
+        setIsProcessing(false);
+        hasProcessedRef.current = true;
+        setQuantity(finalQuantity);
+        
+        // Clear the stored quantity since it was successful
+        localStorage.removeItem('checkoutLastAttemptedQuantity');
+        setLastAttemptedQuantity(null);
+        
+        // Auto-scroll to success message
+        setTimeout(() => {
+          if (errorRef.current) {
+            errorRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }
+        }, 100);
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          setShowSuccess(false);
+        }, 3000);
+        
+        return;
+      }
+
+      // Only process if quantity actually changed
+      if (finalQuantity !== quantity) {
+        hasProcessedRef.current = true;
+        setQuantity(finalQuantity);
+        
+        setIsProcessing(true);
+        setIsNextDisabled(true);
+        setShowError(false);
+        setShowSuccess(false);
+        
+        // Save the attempted quantity
+        setLastAttemptedQuantity(finalQuantity);
+        localStorage.setItem('checkoutLastAttemptedQuantity', finalQuantity.toString());
+        
+        // Simulate 5 second delay
+        setTimeout(() => {
+          setIsProcessing(false);
+          setShowError(true);
+          setIsNextDisabled(true); // Keep Next button disabled after error
+          
+          // Auto-scroll to error message
+          setTimeout(() => {
+            if (errorRef.current) {
+              errorRef.current.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+              });
+            }
+          }, 100);
+        }, 5000);
+      }
+    }, 1000); // 1 second debounce
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [inputQuantity, quantity, lastAttemptedQuantity, errorRef]);
+
+  // Handle input change - updates input value immediately (no processing)
+  const handleQuantityChange = (value: number | string | undefined) => {
+    setInputQuantity(value || 10);
+  };
+
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
+  return (
+    <Box>
+      {/* Top Header Bar */}
+      <Box style={{ 
+        backgroundColor: '#3c3c3c', 
+        padding: '16px 0',
+        marginBottom: '24px',
+        borderRadius: '4px'
+      }}>
+        <Container size="xl">
+          <Group justify="space-between" align="center">
+            <Button 
+              variant="subtle" 
+              color="white"
+              leftSection={<IconArrowLeft size={16} />}
+            >
+              Continue Shopping
+            </Button>
+            <Badge 
+              size="lg" 
+              variant="outline" 
+              style={{ 
+                backgroundColor: 'white',
+                color: '#3c3c3c',
+                borderColor: '#3c3c3c',
+                padding: '8px 16px'
+              }}
+            >
+              ACME
+            </Badge>
+          </Group>
+        </Container>
+      </Box>
+
+      {/* Success Message */}
+      {showSuccess && (
+        <Alert 
+          ref={errorRef}
+          icon={<IconCheck size={16} />} 
+          title="Quantity Updated Successfully" 
+          color="green"
+          mb="md"
+        >
+          <Text size="sm">
+            Your quantity has been successfully updated to {quantity} users. The pricing has been recalculated.
+          </Text>
+        </Alert>
+      )}
+
+      {/* Error Message */}
+      {showError && (
+        <Alert 
+          ref={errorRef}
+          icon={<IconAlertTriangle size={16} />} 
+          title="System Slowness Detected" 
+          color="orange"
+          mb="md"
+        >
+          <Text size="sm" mb="sm">
+            We're experiencing slowness from downstream systems. Your changes may not have been saved properly.
+          </Text>
+          <Button 
+            leftSection={<IconRefresh size={16} />} 
+            variant="outline" 
+            size="sm"
+            onClick={handleRefresh}
+          >
+            Refresh Page
+          </Button>
+        </Alert>
+      )}
+
+      <Grid>
+        {/* Left Column - Cart Details */}
+        <Grid.Col span={{ base: 12, lg: 8 }}>
+          <Stack gap="md">
+            <Box>
+              <Text size="sm" c="dimmed" mb={4}>Step 1 of 2</Text>
+              <Title order={2} mb="xl">Cart</Title>
+            </Box>
+
+            {/* Product Card */}
+            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ backgroundColor: 'white' }}>
+              <Group justify="space-between" align="flex-start" mb="md">
+                <Group>
+                  <ThemeIcon 
+                    color="#0891b2" 
+                    size={48} 
+                    radius="md"
+                    style={{ backgroundColor: '#0891b2' }}
+                  >
+                    <Text size="sm" fw={700} c="white">Dn</Text>
+                  </ThemeIcon>
+                  <Stack gap={4}>
+                    <Text fw={600} size="lg">3YC - RFS Dreamweaver</Text>
+                    <Text size="sm" c="dimmed">Adobe Developer</Text>
+                  </Stack>
+                </Group>
+                <Anchor size="sm" c="blue">Remove</Anchor>
+              </Group>
+
+              {/* Plan Details */}
+              <Box mb="md">
+                <Text fw={500} size="sm" mb="xs">Annual Plan (EU English) Level 1</Text>
+                <Text size="xs" c="dimmed">
+                  Minimum contract duration is 1 year. Early cancellation charge of 100% will apply. Auto-renews to a 1 year contract.
+                </Text>
+              </Box>
+
+              {/* Total Users Input */}
+              <Box mb="md">
+                <Group align="center" gap="md">
+                  <Text size="sm" fw={500}>Total Users</Text>
+                  <NumberInput
+                    value={inputQuantity}
+                    onChange={handleQuantityChange}
+                    min={1}
+                    size="sm"
+                    style={{ width: 100 }}
+                    disabled={isProcessing}
+                  />
+                </Group>
+              </Box>
+
+              {/* Pricing Information */}
+              <Box>
+                <Stack gap="xs">
+                  <Group gap="xs" align="center">
+                    <Text size="sm" td="line-through" c="dimmed">$10.00 / User / year</Text>
+                  </Group>
+                  <Group gap="xs" align="center">
+                    <Text size="sm" fw={600} c="#0891b2">$7.50 / User / year</Text>
+                    <IconBolt size={16} color="#0891b2" />
+                    <Text size="sm" c="#0891b2">3-year Commit pricing applied</Text>
+                  </Group>
+                </Stack>
+              </Box>
+            </Card>
+          </Stack>
+        </Grid.Col>
+
+        {/* Right Column - Order Summary */}
+        <Grid.Col span={{ base: 12, lg: 4 }}>
+          <Stack gap="md">
+            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ backgroundColor: 'white' }}>
+              {/* Product Summary */}
+              <Paper p="sm" withBorder mb="md" style={{ backgroundColor: '#f9fafb' }}>
+                <Group mb="xs">
+                  <ThemeIcon 
+                    color="#0891b2" 
+                    size={32} 
+                    radius="md"
+                    style={{ backgroundColor: '#0891b2' }}
+                  >
+                    <Text size="xs" fw={700} c="white">Dn</Text>
+                  </ThemeIcon>
+                  <Stack gap={2} style={{ flex: 1 }}>
+                    <Text size="sm" fw={500}>3YC - RFS Dreamweaver</Text>
+                    <Text size="xs" c="dimmed">Annual Plan (EU English) Level 1</Text>
+                  </Stack>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">{quantity} Users (yearly)</Text>
+                  <Text size="sm" fw={500}>${yearlyPrice.toFixed(2)}</Text>
+                </Group>
+              </Paper>
+
+              {/* Discount Codes */}
+              <Box mb="md">
+                <Text size="sm" c="dimmed" mb="xs">Apply discount codes</Text>
+                <Group>
+                  <TextInput 
+                    placeholder="Enter code" 
+                    size="sm"
+                    style={{ flex: 1 }}
+                  />
+                  <Button size="sm" variant="outline">Apply</Button>
+                </Group>
+              </Box>
+
+              {/* Due Now */}
+              <Box mb="md">
+                <Group justify="space-between" mb="xs">
+                  <Text size="sm" fw={600}>Due now</Text>
+                  <Text size="lg" fw={600}>${dueNow.toFixed(2)}</Text>
+                </Group>
+                <Text size="xs" c="dimmed" mb="sm">
+                  Price reflects one-time and prorated recurring charges, if applicable.
+                </Text>
+                <Stack gap="xs">
+                  <Group justify="space-between">
+                    <Text size="sm">Subtotal</Text>
+                    <Text size="sm">${subtotal.toFixed(2)}</Text>
+                  </Group>
+                  <Group justify="space-between">
+                    <Text size="sm">Estimated tax</Text>
+                    <Text size="sm">${tax.toFixed(2)}</Text>
+                  </Group>
+                </Stack>
+              </Box>
+
+              {/* Estimated Recurring Charges */}
+              <Box>
+                <Text size="sm" fw={600} mb="xs">Estimated recurring charges</Text>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Due yearly (excluding tax)</Text>
+                  <Text size="sm" fw={500}>${yearlyPrice.toFixed(2)}</Text>
+                </Group>
+              </Box>
+
+              {/* Next Button */}
+              <Button 
+                color="#0891b2"
+                fullWidth
+                size="lg"
+                mt="lg"
+                disabled={isNextDisabled || isProcessing}
+                leftSection={isProcessing ? <Loader size="xs" color="white" /> : null}
+              >
+                Next
+              </Button>
+            </Card>
+          </Stack>
+        </Grid.Col>
+      </Grid>
+    </Box>
   );
 };
 

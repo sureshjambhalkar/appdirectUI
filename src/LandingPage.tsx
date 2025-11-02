@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Container, Title, Text, Group, Card, Button, Stack, Grid, ActionIcon, Tooltip } from '@mantine/core';
 
@@ -53,7 +53,14 @@ const LandingPage: React.FC = () => {
     }
   ];
 
-  const [napkins, setNapkins] = useState(allNapkins);
+  // Filter out hidden napkins
+  const visibleNapkins = useMemo(() => 
+    allNapkins.filter(napkin => 
+      napkin.id !== 'appinsights-ai' && napkin.id !== 'company-flow'
+    ), []
+  );
+
+  const [napkins, setNapkins] = useState(visibleNapkins);
 
   useEffect(() => {
     // Read visibility settings from localStorage
@@ -61,13 +68,13 @@ const LandingPage: React.FC = () => {
     if (saved) {
       try {
         const settings = JSON.parse(saved);
-        const filteredNapkins = allNapkins.filter(napkin => 
+        const filteredNapkins = visibleNapkins.filter(napkin => 
           settings[napkin.id] !== false // Show napkin unless explicitly hidden
         );
         setNapkins(filteredNapkins);
       } catch (e) {
         console.error('Error loading napkin visibility settings:', e);
-        setNapkins(allNapkins); // Fallback to showing all
+        setNapkins(visibleNapkins); // Fallback to showing visible ones
       }
     }
   }, []);
