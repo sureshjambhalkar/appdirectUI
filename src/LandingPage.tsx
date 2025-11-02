@@ -50,6 +50,11 @@ const LandingPage: React.FC = () => {
       id: 'adobe-checkout-slowness',
       demo: 'Adobe Checkout Slowness',
       color: '#f97316' // Orange - checkout/slowness theme
+    },
+    {
+      id: 'mid-term-upgrades',
+      demo: 'Mid Term Upgrades - Revert Order',
+      color: '#8b5cf6' // Purple - upgrades theme
     }
   ];
 

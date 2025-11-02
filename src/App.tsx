@@ -10,6 +10,7 @@ import AdobeNewFunctionalitiesFlow from './AdobeNewFunctionalitiesFlow';
 import AdobeDiscountsFlow from './AdobeDiscountsFlow';
 import AdobeVIPMPMigrationsFlow from './AdobeVIPMPMigrationsFlow';
 import AdobeCheckoutSlownessFlow from './AdobeCheckoutSlownessFlow';
+import MidTermUpgradesFlow from './MidTermUpgradesFlow';
 import AdminFlow from './AdminFlow';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
         <Route path="/adobe-discounts/*" element={<AdobeDiscountsFlow />} />
         <Route path="/adobemig/*" element={<AdobeVIPMPMigrationsFlow />} />
         <Route path="/adobe-checkout-slowness/*" element={<AdobeCheckoutSlownessFlow />} />
+        <Route path="/mid-term-upgrades/*" element={<MidTermUpgradesFlow />} />
         <Route path="/admin/*" element={<AdminFlow />} />
       </Routes>
     </Router>
