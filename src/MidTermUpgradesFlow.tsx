@@ -17,7 +17,8 @@ import {
   Progress,
   Divider,
   ThemeIcon,
-  Radio
+  Radio,
+  Anchor
 } from '@mantine/core';
 import {
   IconEdit,
@@ -85,7 +86,21 @@ const RevertOrderModal: React.FC<RevertOrderModalProps> = ({ opened, onClose, sc
                     </ThemeIcon>
                     <Box style={{ flex: 1 }}>
                       <Text fw={500} size="sm">Adobe Photoshop for teams</Text>
-                      <Text size="xs" c="dimmed">(Order B)</Text>
+                      <Group gap={4} align="center">
+                        <Text size="xs" c="dimmed">(Order B -</Text>
+                        <Anchor 
+                          size="xs" 
+                          c="#0891b2" 
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            alert('Navigate to Order #10872187');
+                          }}
+                        >
+                          #10872187
+                        </Anchor>
+                        <Text size="xs" c="dimmed">)</Text>
+                      </Group>
                     </Box>
                   </Group>
                   <Stack gap={4} mt="xs">
@@ -112,7 +127,21 @@ const RevertOrderModal: React.FC<RevertOrderModalProps> = ({ opened, onClose, sc
                     </ThemeIcon>
                     <Box style={{ flex: 1 }}>
                       <Text fw={500} size="sm">Adobe Illustrator for teams</Text>
-                      <Text size="xs" c="dimmed">(Order C)</Text>
+                      <Group gap={4} align="center">
+                        <Text size="xs" c="dimmed">(Order C -</Text>
+                        <Anchor 
+                          size="xs" 
+                          c="#0891b2" 
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            alert('Navigate to Order #10872186');
+                          }}
+                        >
+                          #10872186
+                        </Anchor>
+                        <Text size="xs" c="dimmed">)</Text>
+                      </Group>
                     </Box>
                   </Group>
                   <Stack gap={4} mt="xs">
@@ -145,7 +174,21 @@ const RevertOrderModal: React.FC<RevertOrderModalProps> = ({ opened, onClose, sc
                   </ThemeIcon>
                   <Box style={{ flex: 1 }}>
                     <Text fw={500} size="sm">Adobe Creative Cloud All Apps for teams</Text>
-                    <Text size="xs" c="dimmed">(Order A)</Text>
+                    <Group gap={4} align="center">
+                      <Text size="xs" c="dimmed">(Order A -</Text>
+                      <Anchor 
+                        size="xs" 
+                        c="#0891b2" 
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          alert('Navigate to Order #10872185');
+                        }}
+                      >
+                        #10872185
+                      </Anchor>
+                      <Text size="xs" c="dimmed">)</Text>
+                    </Group>
                   </Box>
                 </Group>
                 <Stack gap={4} mt="xs">
@@ -193,6 +236,21 @@ const RevertOrderModal: React.FC<RevertOrderModalProps> = ({ opened, onClose, sc
                   </ThemeIcon>
                   <Box style={{ flex: 1 }}>
                     <Text fw={500} size="sm">Adobe Photoshop for teams</Text>
+                    <Group gap={4} align="center" mt={4}>
+                      <Text size="xs" c="dimmed">(Order B -</Text>
+                      <Anchor 
+                        size="xs" 
+                        c="#0891b2" 
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          alert('Navigate to Order #10872187');
+                        }}
+                      >
+                        #10872187
+                      </Anchor>
+                      <Text size="xs" c="dimmed">)</Text>
+                    </Group>
                     <Stack gap={4} mt="xs">
                       <Group justify="space-between">
                         <Text size="xs" c="dimmed">Quantity:</Text>
@@ -224,6 +282,7 @@ const RevertOrderModal: React.FC<RevertOrderModalProps> = ({ opened, onClose, sc
                   </ThemeIcon>
                   <Box style={{ flex: 1 }}>
                     <Text fw={500} size="sm">Adobe Creative Cloud All Apps for teams</Text>
+                    <Text size="xs" c="dimmed" mt={4}>(New Order - Will be created)</Text>
                   </Box>
                 </Group>
                 <Stack gap={4} mt="xs">
@@ -316,7 +375,7 @@ const MidTermUpgradesMain: React.FC = () => {
         {/* Page Header */}
         <Group justify="space-between" align="center" mb="xl">
           <Title order={1} size="h2" fw={600}>
-            NCE Microsoft 365 Enterprise
+            Adobe Creative Cloud All Apps for teams
           </Title>
           <Group>
             <Button variant="outline" leftSection={<IconEdit size={16} />}>
@@ -423,7 +482,7 @@ const MidTermUpgradesMain: React.FC = () => {
                 <Grid.Col span={12}>
                   <Box>
                     <Text size="xs" c="dimmed">Edition</Text>
-                    <Text size="sm" fw={500}>Microsoft 365 F1</Text>
+                    <Text size="sm" fw={500}>Adobe Creative Cloud All Apps</Text>
                   </Box>
                 </Grid.Col>
                 <Grid.Col span={12}>
@@ -523,9 +582,6 @@ const MidTermUpgradesMain: React.FC = () => {
 
               <Divider my="md" />
 
-              <Text size="sm" mb="md">
-                abcd
-              </Text>
               <Text size="sm" c="#0891b2" style={{ cursor: 'pointer' }} mb="md">
                 More Details »
               </Text>

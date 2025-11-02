@@ -53,7 +53,7 @@ const LandingPage: React.FC = () => {
     },
     {
       id: 'mid-term-upgrades',
-      demo: 'Mid Term Upgrades - Revert Order',
+      demo: 'Mid Term - Revert Order',
       color: '#8b5cf6' // Purple - upgrades theme
     }
   ];
