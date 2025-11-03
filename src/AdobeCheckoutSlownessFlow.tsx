@@ -22,7 +22,9 @@ import {
   ThemeIcon,
   Loader,
   Anchor,
-  Tabs
+  Tabs,
+  Notification,
+  SegmentedControl
 } from '@mantine/core';
 import { 
   IconArrowLeft, 
@@ -65,6 +67,37 @@ const AdobeCheckoutSlownessFlow: React.FC = () => {
       navigate('/adobe-checkout-slowness/quotes', { replace: true });
     }
   }, [location.pathname, navigate]);
+
+  // Add CSS for sliding notification animation from bottom-right
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      @keyframes slideOutRight {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   return (
     <Box style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
@@ -137,11 +170,18 @@ const AdobeCheckoutSlownessFlow: React.FC = () => {
 // Quotes Page Content Component (moved from OpportunityPageContent)
 const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }> = ({ errorRef }) => {
   const [quantity, setQuantity] = useState(1);
+  const [displayQuantity, setDisplayQuantity] = useState(1); // Displayed quantity (updated only on success)
   const [isSaving, setIsSaving] = useState(false);
   const [showError, setShowError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastAttemptedQuantity, setLastAttemptedQuantity] = useState<number | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showNotification, setShowNotification] = useState(false);
+  const [showPersistentError, setShowPersistentError] = useState(false);
+  const [demoMode, setDemoMode] = useState<'success' | 'failure'>('failure');
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const notificationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load last attempted quantity from localStorage on component mount
   useEffect(() => {
@@ -151,24 +191,78 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
     }
   }, []);
 
-  // Calculate pricing based on quantity
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Reset state when demo mode changes
+  useEffect(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (notificationTimerRef.current) {
+      clearTimeout(notificationTimerRef.current);
+      notificationTimerRef.current = null;
+    }
+    setIsSaving(false);
+    setIsProcessing(false);
+    setShowError(false);
+    setShowSuccess(false);
+    setShowPersistentError(false);
+    setShowNotification(false);
+    setRetryCount(0);
+    setDisplayQuantity(quantity); // Reset display quantity when demo mode changes
+  }, [demoMode]); // Removed quantity from dependencies - only reset when demo mode changes
+
+  // Calculate pricing based on displayed quantity (only updates on success)
   const unitPrice = 335.88;
-  const totalPrice = quantity * unitPrice;
+  const originalUnitPrice = 400.00; // For discount display
+  const discountedUnitPrice = 335.88; // With 3YC discount (16% off)
+  const totalPrice = displayQuantity * discountedUnitPrice;
   const proratedAmount = totalPrice * 0.96; // 96% of total for prorated
   const tax = proratedAmount * 0.05; // 5% tax
   const totalDueToday = proratedAmount + tax;
 
+  const attemptPriceFetch = async (attemptNumber: number): Promise<boolean> => {
+    // Simulate API call delay - 2.5 seconds for initial attempt (50% reduction from 5s), 3 seconds for retries
+    const delay = attemptNumber === 1 ? 2500 : 3000;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // For demo mode: fail for failure mode, succeed for success mode
+    if (demoMode === 'failure') {
+      // Always fail if in failure mode (until 3 retries exhausted)
+      return false;
+    } else {
+      // Success mode: succeed on 3rd attempt (after initial 2.5s wait + 2 retries)
+      return attemptNumber === 3;
+    }
+  };
+
   const handleSave = async () => {
-    // Check if user is trying the same quantity that previously failed
-    if (lastAttemptedQuantity !== null && quantity === lastAttemptedQuantity) {
-      // Same quantity as last attempt - show success message
+    // Check if this is a retry of the same quantity after a failed attempt (cache scenario)
+    const cachedFailedQuantity = localStorage.getItem('lastAttemptedQuantity');
+    const hadPersistentError = localStorage.getItem('hadPersistentError') === 'true';
+    if (cachedFailedQuantity && parseInt(cachedFailedQuantity, 10) === quantity && (showPersistentError || hadPersistentError)) {
+      // Cache hit - show success immediately
+      setDisplayQuantity(quantity);
+      setIsSaving(false);
+      setIsProcessing(false);
       setShowSuccess(true);
-      setShowError(false);
-      
-      // Clear the stored quantity since it was successful
+      setShowPersistentError(false);
+      setRetryCount(0);
       localStorage.removeItem('lastAttemptedQuantity');
+      localStorage.removeItem('hadPersistentError');
       setLastAttemptedQuantity(null);
-      
+
       // Auto-scroll to success message
       setTimeout(() => {
         if (errorRef.current) {
@@ -178,40 +272,135 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
           });
         }
       }, 100);
-      
-      // Hide success message after 3 seconds
+
+      // Hide success message after 5 seconds
       setTimeout(() => {
         setShowSuccess(false);
-      }, 3000);
-      
+      }, 5000);
       return;
     }
-    
-    // Different quantity or first attempt - proceed with normal flow
+
     setIsSaving(true);
     setIsProcessing(true);
+    setShowError(false);
+    setShowSuccess(false);
+    setShowPersistentError(false);
+    setRetryCount(0);
     setLastAttemptedQuantity(quantity);
-    
-    // Save the attempted quantity to localStorage
     localStorage.setItem('lastAttemptedQuantity', quantity.toString());
-    
-    // Simulate 5 minutes of processing
-    setTimeout(() => {
-      setIsSaving(false);
-      setIsProcessing(false);
-      setShowError(true);
-      setShowSuccess(false);
-      
-      // Auto-scroll to error message
-      setTimeout(() => {
-        if (errorRef.current) {
-          errorRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
-          });
+
+    // Start retry mechanism
+    const performRetry = async (attemptNumber: number) => {
+      // For success mode, attempt 0 is just the initial 2.5 second wait with spinner (50% reduction from 5s)
+      if (attemptNumber === 0 && demoMode === 'success') {
+        setRetryCount(0);
+        retryTimerRef.current = setTimeout(() => performRetry(1), 2500);
+        return;
+      }
+      const success = await attemptPriceFetch(attemptNumber);
+
+      if (success) {
+        // Success - update displayed quantity and prices, then show success
+        setDisplayQuantity(quantity);
+        setIsSaving(false);
+        setIsProcessing(false);
+        setShowSuccess(true);
+        setRetryCount(0);
+        localStorage.removeItem('lastAttemptedQuantity');
+        setLastAttemptedQuantity(null);
+
+        // Auto-scroll to success message
+        setTimeout(() => {
+          if (errorRef.current) {
+            errorRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }
+        }, 100);
+
+        // Hide success message after 5 seconds
+        setTimeout(() => {
+          setShowSuccess(false);
+        }, 5000);
+        return;
+      }
+
+      // Failed - handle retry logic
+      if (demoMode === 'success') {
+        // Success mode flow: 2.5s wait → attempt 1 with message → attempt 2 with message → success
+        if (attemptNumber === 1) {
+          // First retry: show notification "Adobe APIs are slow, unresponsive, retrying"
+          setRetryCount(1);
+          setShowNotification(true);
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 5000); // Changed from 2000 to 5000 (5 seconds)
+          // Continue with spinner and retry after 3 seconds
+          retryTimerRef.current = setTimeout(() => performRetry(2), 3000);
+        } else if (attemptNumber === 2) {
+          // Second retry: show notification again
+          setRetryCount(2);
+          setShowNotification(true);
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 5000); // Changed from 2000 to 5000 (5 seconds)
+          // Continue with spinner and retry (will succeed on attempt 3)
+          retryTimerRef.current = setTimeout(() => performRetry(3), 3000);
         }
-      }, 100);
-    }, 5000); // 5 seconds for demo (change to 300000 for 5 minutes)
+      } else {
+        // Failure mode flow
+        if (attemptNumber === 1) {
+          // First failure: silent retry (just spinner, no notification, 2.5 seconds - 50% reduction)
+          setRetryCount(1);
+          retryTimerRef.current = setTimeout(() => performRetry(2), 2500);
+        } else if (attemptNumber === 2) {
+          // Second failure: show sliding notification
+          setRetryCount(2);
+          setShowNotification(true);
+          // Auto-hide notification after 2 seconds
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 2000);
+          // Continue with spinner and retry after 3 seconds
+          retryTimerRef.current = setTimeout(() => performRetry(3), 3000);
+        } else if (attemptNumber === 3) {
+          // Third failure: show notification again
+          setRetryCount(3);
+          setShowNotification(true);
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 5000); // Changed from 2000 to 5000 (5 seconds)
+          // Show persistent error after 3 retries
+          retryTimerRef.current = setTimeout(() => {
+            setIsSaving(false);
+            setIsProcessing(false);
+            setShowPersistentError(true);
+            setShowError(false);
+            setRetryCount(0);
+            // Store flag in localStorage for cache detection after refresh
+            localStorage.setItem('hadPersistentError', 'true');
+
+            // Auto-scroll to error message
+            setTimeout(() => {
+              if (errorRef.current) {
+                errorRef.current.scrollIntoView({ 
+                  behavior: 'smooth', 
+                  block: 'center' 
+                });
+              }
+            }, 100);
+          }, 3000);
+        }
+      }
+    };
+
+    // Start retry mechanism - for success mode, start with 2.5s wait (attempt 0)
+    if (demoMode === 'success') {
+      performRetry(0);
+    } else {
+      performRetry(1);
+    }
   };
 
   const handleRefresh = () => {
@@ -219,6 +408,59 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
   };
 
   return (
+    <Box>
+      {/* Notification - Sliding message from bottom-right */}
+      {showNotification && (
+        <Box style={{ 
+          position: 'fixed', 
+          bottom: '220px', // Moved up by 5cm (200px) from 20px
+          right: '20px', 
+          zIndex: 1000,
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <Notification
+            icon={<IconAlertTriangle size={18} />}
+            color="orange"
+            title="Adobe API Slowness"
+            onClose={() => setShowNotification(false)}
+            withCloseButton
+            styles={{
+              root: {
+                minWidth: '400px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            Experiencing slowness from Adobe APIs. Retrying the operation to fetch latest prices.
+          </Notification>
+        </Box>
+      )}
+
+      {/* Demo Mode Toggle */}
+      <Box mb="md" style={{ 
+        position: 'sticky', 
+        top: '20px', 
+        zIndex: 100,
+        backgroundColor: 'white',
+        padding: '12px',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb',
+        marginBottom: '16px'
+      }}>
+        <Group justify="space-between" align="center">
+          <Text size="sm" fw={500}>Demo Mode:</Text>
+          <SegmentedControl
+            value={demoMode}
+            onChange={(value) => setDemoMode(value as 'success' | 'failure')}
+            data={[
+              { label: 'Success Flow', value: 'success' },
+              { label: 'Failure Flow', value: 'failure' }
+            ]}
+            size="sm"
+          />
+        </Group>
+      </Box>
+
     <Grid>
       {/* Main Content */}
       <Grid.Col span={{ base: 12, lg: 8 }}>
@@ -253,7 +495,7 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
             </Title>
             
             <Group>
-              <Button color="blue" disabled={showError || showSuccess}>Finalize</Button>
+              <Button color="blue" disabled={showPersistentError || isProcessing}>Finalize</Button>
               <Button variant="outline">Clone Opportunity</Button>
             </Group>
           </Card>
@@ -263,36 +505,13 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
             <Alert 
               ref={errorRef}
               icon={<IconCheck size={16} />} 
-              title="Quantity Updated Successfully" 
+              title="Price Updated Successfully" 
               color="green"
               mb="md"
             >
               <Text size="sm">
-                Your quantity has been successfully updated to {quantity} users. The pricing has been recalculated.
+                Prices have been successfully updated for {quantity} users. The pricing has been recalculated with latest discounts.
               </Text>
-            </Alert>
-          )}
-
-          {/* Error Message */}
-          {showError && (
-            <Alert 
-              ref={errorRef}
-              icon={<IconAlertTriangle size={16} />} 
-              title="System Slowness Detected" 
-              color="orange"
-              mb="md"
-            >
-              <Text size="sm" mb="sm">
-                We're experiencing slowness from downstream systems. Your changes may not have been saved properly.
-              </Text>
-              <Button 
-                leftSection={<IconRefresh size={16} />} 
-                variant="outline" 
-                size="sm"
-                onClick={handleRefresh}
-              >
-                Refresh Page
-              </Button>
             </Alert>
           )}
 
@@ -351,59 +570,32 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
             </Grid>
           </Card>
 
-          {/* Payment Section */}
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Payment</Title>
-              <ActionIcon variant="subtle" size="sm">
-                <IconEdit size={14} />
-                <Text size="xs" ml="xs">Edit</Text>
-              </ActionIcon>
-            </Group>
-            
-            <Grid>
-              <Grid.Col span={6}>
-                <Box>
-                  <Text size="sm" c="dimmed" mb="sm">Payment Method</Text>
-                  <Group>
-                    <ThemeIcon color="blue" size="md" radius="md">
-                      <IconCreditCard size={16} />
-                    </ThemeIcon>
-                    <Box>
-                      <Text size="sm" fw={500}>Visa ending in 1111</Text>
-                      <Text size="sm" c="dimmed">Suresh Test</Text>
-                      <Text size="sm" c="dimmed">Expires 09/27</Text>
-                    </Box>
-                  </Group>
-                </Box>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Box>
-                  <Text size="sm" c="dimmed" mb="sm">Billing Address</Text>
-                  <Group>
-                    <ThemeIcon color="gray" size="md" radius="md">
-                      <IconMapPin size={16} />
-                    </ThemeIcon>
-                    <Box>
-                      <Text size="sm">123 Amen Corner</Text>
-                      <Text size="sm">Raleigh, NC</Text>
-                      <Text size="sm">US 27607</Text>
-                      <Group gap="xs" mt="xs">
-                        <ThemeIcon color="gray" size="sm" radius="md">
-                          <IconPhone size={12} />
-                        </ThemeIcon>
-                        <Text size="sm">5305556465</Text>
-                      </Group>
-                    </Box>
-                  </Group>
-                </Box>
-              </Grid.Col>
-            </Grid>
-          </Card>
-
           {/* Products Section */}
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Title order={4} mb="md">Products</Title>
+            
+            {/* Persistent Error Message - Above Products section */}
+            {showPersistentError && (
+              <Alert 
+                ref={errorRef}
+                icon={<IconAlertTriangle size={16} />} 
+                title="Unable to Fetch Latest Prices" 
+                color="red"
+                mb="md"
+              >
+                <Text size="sm" mb="sm">
+                  We are experiencing slowness to get latest pricing from Adobe. All retry attempts have been exhausted. Please refresh the page after few minutes to view the latest price.
+                </Text>
+                <Button 
+                  leftSection={<IconRefresh size={16} />} 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleRefresh}
+                >
+                  Refresh Page
+                </Button>
+              </Alert>
+            )}
             
             <TextInput 
               placeholder="Search to add a product" 
@@ -433,98 +625,129 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
                 </Group>
               </Group>
               
-              <Stack gap="md">
-                {/* Plan */}
-                <Box>
-                  <Text size="sm" c="dimmed" mb="xs">Plan</Text>
-                  <Text size="sm">Pro subscription, annual - Yearly - 1 Year Contract</Text>
-                </Box>
+              <Grid gutter="md">
+                <Grid.Col span={12}>
+                  {/* Plan */}
+                  <Box mb="md">
+                    <Text size="sm" c="dimmed" mb="xs">Plan</Text>
+                    <Text size="sm">Pro subscription, annual - Yearly - 1 Year Contract</Text>
+                  </Box>
+                </Grid.Col>
                 
-                {/* Users */}
-                <Box>
-                  <Text size="sm" c="dimmed" mb="xs">Users</Text>
-                  <NumberInput
-                    value={quantity}
-                    onChange={(value) => setQuantity(value || 1)}
-                    min={1}
-                    size="sm"
-                    rightSection={<IconCheck size={16} color="green" />}
-                    style={{ width: 100 }}
-                  />
-                  <Text size="xs" c="dimmed" mt="xs">Minimum 1</Text>
-                </Box>
+                <Grid.Col span={6}>
+                  {/* Users */}
+                  <Box mb="md">
+                    <Text size="sm" c="dimmed" mb="xs">Users</Text>
+                    <NumberInput
+                      value={quantity}
+                      onChange={(value) => setQuantity(typeof value === 'number' ? value : 1)}
+                      min={1}
+                      size="sm"
+                      rightSection={<IconCheck size={16} color="green" />}
+                      style={{ width: 100 }}
+                    />
+                    <Text size="xs" c="dimmed" mt="xs">Minimum 1</Text>
+                  </Box>
+                </Grid.Col>
                 
-                {/* Markup */}
-                <Box>
-                  <Text size="sm" c="dimmed" mb="xs">Apply Markdown / MarkUp % (optional)</Text>
-                  <Group gap="xs" mb="xs">
-                    <Button variant="filled" size="xs">MarkUp %</Button>
-                    <Button variant="outline" size="xs">Markdown %</Button>
-                  </Group>
-                  <NumberInput
-                    value={0}
-                    size="sm"
-                    style={{ width: 100 }}
-                  />
-                  <Text size="xs" c="dimmed" mt="xs">Markup the price by using percentage points here</Text>
-                </Box>
+                <Grid.Col span={6}>
+                  {/* Markup */}
+                  <Box mb="md">
+                    <Text size="sm" c="dimmed" mb="xs">Apply Markdown / MarkUp % (optional)</Text>
+                    <Group gap="xs" mb="xs">
+                      <Button variant="filled" size="xs">MarkUp %</Button>
+                      <Button variant="outline" size="xs">Markdown %</Button>
+                    </Group>
+                    <NumberInput
+                      value={0}
+                      size="sm"
+                      style={{ width: 100 }}
+                    />
+                    <Text size="xs" c="dimmed" mt="xs">Markup the price by using percentage points here</Text>
+                  </Box>
+                </Grid.Col>
                 
-                {/* Pricing Table */}
-                <Box>
-                  <Text size="sm" c="dimmed" mb="xs">Product Pricing</Text>
-                  <Table>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Description</Table.Th>
-                        <Table.Th>Frequency</Table.Th>
-                        <Table.Th>Quantity</Table.Th>
-                        <Table.Th>Unit wholesale price</Table.Th>
-                        <Table.Th>Unit selling price</Table.Th>
-                        <Table.Th>Total selling price</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      <Table.Tr>
-                        <Table.Td>Recurring Fee Per User (USER)</Table.Td>
-                        <Table.Td>Yearly</Table.Td>
-                        <Table.Td>{quantity}</Table.Td>
-                        <Table.Td>—</Table.Td>
-                        <Table.Td>$335.88</Table.Td>
-                        <Table.Td>${totalPrice.toFixed(2)}</Table.Td>
-                      </Table.Tr>
-                    </Table.Tbody>
-                  </Table>
-                </Box>
+                <Grid.Col span={12}>
+                  {/* Pricing Table */}
+                  <Box mb="md">
+                    <Text size="sm" c="dimmed" mb="xs">Product Pricing</Text>
+                    {showSuccess && (
+                      <Box mb="xs" p="xs" style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px' }}>
+                        <Group gap={4} align="center">
+                          <Text size="xs" td="line-through" c="dimmed">${originalUnitPrice.toFixed(2)} / User / year</Text>
+                        </Group>
+                        <Group gap={4} align="center" mt={4}>
+                          <Text size="xs" fw={600} c="#0891b2">${discountedUnitPrice.toFixed(2)} / User / year</Text>
+                          <IconBolt size={12} color="#0891b2" />
+                          <Text size="xs" c="#0891b2">3-year Commit pricing applied</Text>
+                        </Group>
+                      </Box>
+                    )}
+                    <Table>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Description</Table.Th>
+                          <Table.Th>Frequency</Table.Th>
+                          <Table.Th>Quantity</Table.Th>
+                          <Table.Th>Unit wholesale price</Table.Th>
+                          <Table.Th>Unit selling price</Table.Th>
+                          <Table.Th>Total selling price</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        <Table.Tr>
+                          <Table.Td>Recurring Fee Per User (USER)</Table.Td>
+                          <Table.Td>Yearly</Table.Td>
+                          <Table.Td>{displayQuantity}</Table.Td>
+                          <Table.Td>—</Table.Td>
+                          <Table.Td>
+                            {showSuccess ? (
+                              <Group gap={4}>
+                                <Text size="sm" td="line-through" c="dimmed">${originalUnitPrice.toFixed(2)}</Text>
+                                <Text size="sm" fw={500} c="#0891b2">${discountedUnitPrice.toFixed(2)}</Text>
+                              </Group>
+                            ) : (
+                              <Text size="sm">$335.88</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>${totalPrice.toFixed(2)}</Table.Td>
+                        </Table.Tr>
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                </Grid.Col>
                 
-                {/* Contract Terms */}
-                <Box>
-                  <Text size="sm" c="dimmed" mb="xs">Contract Terms</Text>
-                  <Text size="sm">Length: 1 year(s)</Text>
-                  <Button variant="outline" size="xs" mt="xs">Add custom contract</Button>
-                </Box>
+                <Grid.Col span={6}>
+                  {/* Contract Terms */}
+                  <Box>
+                    <Text size="sm" c="dimmed" mb="xs">Contract Terms</Text>
+                    <Text size="sm" mb="xs">Length: 1 year(s)</Text>
+                    <Button variant="outline" size="xs">Add custom contract</Button>
+                  </Box>
+                </Grid.Col>
                 
-                {/* Date Controls */}
-                <Box>
-                  <Text size="sm" c="dimmed" mb="xs">Date Controls</Text>
-                  <Stack gap="sm">
-                    <Box>
-                      <Text size="sm" c="dimmed" mb="xs">Request service on:</Text>
-                      <Group gap="xs">
+                <Grid.Col span={6}>
+                  {/* Date Controls */}
+                  <Box>
+                    <Text size="sm" c="dimmed" mb="xs">Date Controls</Text>
+                    <Box mb="xs">
+                      <Text size="xs" c="dimmed" mb={4}>Request service on:</Text>
+                      <Group gap={4}>
                         <Button variant="filled" size="xs">Immediate</Button>
                         <Button variant="outline" size="xs">Fixed date</Button>
                       </Group>
                     </Box>
                     <Box>
-                      <Text size="sm" c="dimmed" mb="xs">Billing effective on:</Text>
-                      <Group gap="xs">
+                      <Text size="xs" c="dimmed" mb={4}>Billing effective on:</Text>
+                      <Group gap={4}>
                         <Button variant="filled" size="xs">Service activation</Button>
                         <Button variant="outline" size="xs">Next billing cycle</Button>
                         <Button variant="outline" size="xs">Fixed date</Button>
                       </Group>
                     </Box>
-                  </Stack>
-                </Box>
-              </Stack>
+                  </Box>
+                </Grid.Col>
+              </Grid>
             </Paper>
             
             {/* Action Buttons */}
@@ -579,7 +802,16 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
               </Group>
               <Badge size="xs" color="blue" mb="sm">WEB APP</Badge>
               <Text size="sm" c="dimmed" mb="xs">Pro subscription, annual</Text>
-              <Text size="sm">1 - {quantity} Users - $335.88/User</Text>
+              <Text size="sm">1 - {displayQuantity} Users - {
+                showSuccess ? (
+                  <Group gap={4} style={{ display: 'inline-flex' }}>
+                    <Text size="sm" td="line-through" c="dimmed">$400.00</Text>
+                    <Text size="sm" fw={500} c="#0891b2">$335.88</Text>
+                  </Group>
+                ) : (
+                  '$335.88'
+                )
+              }/User</Text>
               <Text size="sm" fw={500} mt="xs">${totalPrice.toFixed(2)}</Text>
             </Paper>
             
@@ -640,20 +872,25 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
         </Stack>
       </Grid.Col>
     </Grid>
+    </Box>
   );
 };
 
 // Checkout Page Content Component
 const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }> = ({ errorRef }) => {
-  const [inputQuantity, setInputQuantity] = useState<number | string>(10); // Input value (can be partial)
-  const [quantity, setQuantity] = useState(10); // Processed quantity
+  const [quantity, setQuantity] = useState(10);
+  const [displayQuantity, setDisplayQuantity] = useState(10); // Displayed quantity (updated only on success)
   const [isProcessing, setIsProcessing] = useState(false);
   const [showError, setShowError] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastAttemptedQuantity, setLastAttemptedQuantity] = useState<number | null>(null);
   const [isNextDisabled, setIsNextDisabled] = useState(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const hasProcessedRef = useRef(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showNotification, setShowNotification] = useState(false);
+  const [showPersistentError, setShowPersistentError] = useState(false);
+  const [demoMode, setDemoMode] = useState<'success' | 'failure'>('failure');
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const notificationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load last attempted quantity from localStorage on component mount
   useEffect(() => {
@@ -661,50 +898,131 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
     if (savedQuantity) {
       const parsedQuantity = parseInt(savedQuantity, 10);
       setLastAttemptedQuantity(parsedQuantity);
-      // Don't pre-fill the quantity - let user enter it again
-      // This way when they type the same quantity, we can detect it's a retry
     }
   }, []);
 
-  // Pricing calculations based on quantity
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Reset state when demo mode changes
+  useEffect(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (notificationTimerRef.current) {
+      clearTimeout(notificationTimerRef.current);
+      notificationTimerRef.current = null;
+    }
+    setIsProcessing(false);
+    setIsNextDisabled(false);
+    setShowError(false);
+    setShowSuccess(false);
+    setShowPersistentError(false);
+    setShowNotification(false);
+    setRetryCount(0);
+    setDisplayQuantity(quantity); // Reset display quantity when demo mode changes
+  }, [demoMode]); // Removed quantity from dependencies - only reset when demo mode changes
+
+  // Pricing calculations based on displayed quantity (only updates on success)
   const originalUnitPrice = 10.00;
-  const discountedUnitPrice = 7.50;
-  const yearlyPrice = quantity * discountedUnitPrice;
+  const discountedUnitPrice = 7.50; // 3YC discount (25% off)
+  const yearlyPrice = displayQuantity * discountedUnitPrice;
   const subtotal = yearlyPrice * 0.948; // Approximate to match $71.10 for 10 users
   const tax = subtotal * 0.05; // 5% tax
   const dueNow = subtotal + tax;
 
-  // Debounced quantity processing - only processes after user stops typing
-  useEffect(() => {
-    // Clear any existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+  const attemptPriceFetch = async (attemptNumber: number): Promise<boolean> => {
+    // Simulate API call delay - 2.5 seconds for initial attempt (50% reduction from 5s), 3 seconds for retries
+    const delay = attemptNumber === 1 ? 2500 : 3000;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // For demo mode: fail for failure mode, succeed for success mode
+    if (demoMode === 'failure') {
+      // Always fail if in failure mode (until 3 retries exhausted)
+      return false;
+    } else {
+      // Success mode: succeed on 3rd attempt (after initial 2.5s wait + 2 retries)
+      return attemptNumber === 3;
     }
+  };
 
-    const numValue = typeof inputQuantity === 'string' ? parseInt(inputQuantity, 10) : inputQuantity;
-    const finalQuantity = numValue || 10;
-
-    // If quantity hasn't changed from processed quantity, don't do anything
-    if (finalQuantity === quantity && hasProcessedRef.current) {
+  const handleQuantityBlur = async () => {
+    // Check if quantity changed, if not, don't process
+    if (quantity === displayQuantity && !showPersistentError) {
       return;
     }
 
-    // Debounce: wait 1 second after user stops typing before processing
-    debounceTimerRef.current = setTimeout(() => {
-      // Check if this is the retry of a failed quantity (same as lastAttemptedQuantity)
-      if (lastAttemptedQuantity !== null && finalQuantity === lastAttemptedQuantity) {
-        // Same quantity as last attempt - show success immediately
-        setShowSuccess(true);
-        setShowError(false);
-        setIsNextDisabled(false);
+    // Check if this is a retry of the same quantity after a failed attempt (cache scenario)
+    const cachedFailedQuantity = localStorage.getItem('checkoutLastAttemptedQuantity');
+    const hadPersistentError = localStorage.getItem('checkoutHadPersistentError') === 'true';
+    if (cachedFailedQuantity && parseInt(cachedFailedQuantity, 10) === quantity && (showPersistentError || hadPersistentError)) {
+      // Cache hit - show success immediately
+      setDisplayQuantity(quantity);
+      setIsProcessing(false);
+      setIsNextDisabled(false);
+      setShowSuccess(true);
+      setShowPersistentError(false);
+      setRetryCount(0);
+      localStorage.removeItem('checkoutLastAttemptedQuantity');
+      localStorage.removeItem('checkoutHadPersistentError');
+      setLastAttemptedQuantity(null);
+
+      // Auto-scroll to success message
+      setTimeout(() => {
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }
+      }, 100);
+
+      // Hide success message after 5 seconds
+      setTimeout(() => {
+        setShowSuccess(false);
+      }, 5000);
+      return;
+    }
+
+    setIsProcessing(true);
+    setIsNextDisabled(true);
+    setShowError(false);
+    setShowSuccess(false);
+    setShowPersistentError(false);
+    setRetryCount(0);
+    setLastAttemptedQuantity(quantity);
+    localStorage.setItem('checkoutLastAttemptedQuantity', quantity.toString());
+
+    // Start retry mechanism
+    const performRetry = async (attemptNumber: number) => {
+      // For success mode, attempt 0 is just the initial 2.5 second wait with spinner (50% reduction from 5s)
+      if (attemptNumber === 0 && demoMode === 'success') {
+        setRetryCount(0);
+        retryTimerRef.current = setTimeout(() => performRetry(1), 2500);
+        return;
+      }
+      const success = await attemptPriceFetch(attemptNumber);
+
+      if (success) {
+        // Success - update displayed quantity and prices, then show success
+        setDisplayQuantity(quantity);
         setIsProcessing(false);
-        hasProcessedRef.current = true;
-        setQuantity(finalQuantity);
-        
-        // Clear the stored quantity since it was successful
+        setIsNextDisabled(false);
+        setShowSuccess(true);
+        setRetryCount(0);
         localStorage.removeItem('checkoutLastAttemptedQuantity');
         setLastAttemptedQuantity(null);
-        
+
         // Auto-scroll to success message
         setTimeout(() => {
           if (errorRef.current) {
@@ -714,58 +1032,89 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
             });
           }
         }, 100);
-        
-        // Hide success message after 3 seconds
+
+        // Hide success message after 5 seconds
         setTimeout(() => {
           setShowSuccess(false);
-        }, 3000);
-        
+        }, 5000);
         return;
       }
 
-      // Only process if quantity actually changed
-      if (finalQuantity !== quantity) {
-        hasProcessedRef.current = true;
-        setQuantity(finalQuantity);
-        
-        setIsProcessing(true);
-        setIsNextDisabled(true);
-        setShowError(false);
-        setShowSuccess(false);
-        
-        // Save the attempted quantity
-        setLastAttemptedQuantity(finalQuantity);
-        localStorage.setItem('checkoutLastAttemptedQuantity', finalQuantity.toString());
-        
-        // Simulate 5 second delay
-        setTimeout(() => {
-          setIsProcessing(false);
-          setShowError(true);
-          setIsNextDisabled(true); // Keep Next button disabled after error
-          
-          // Auto-scroll to error message
-          setTimeout(() => {
-            if (errorRef.current) {
-              errorRef.current.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'center' 
-              });
-            }
-          }, 100);
-        }, 5000);
-      }
-    }, 1000); // 1 second debounce
+      // Failed - handle retry logic
+      if (demoMode === 'success') {
+        // Success mode flow: 2.5s wait → attempt 1 with message → attempt 2 with message → success
+        if (attemptNumber === 1) {
+          // First retry: show notification "Adobe APIs are slow, unresponsive, retrying"
+          setRetryCount(1);
+          setShowNotification(true);
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 5000); // Changed from 2000 to 5000 (5 seconds)
+          // Continue with spinner and retry after 3 seconds
+          retryTimerRef.current = setTimeout(() => performRetry(2), 3000);
+        } else if (attemptNumber === 2) {
+          // Second retry: show notification again
+          setRetryCount(2);
+          setShowNotification(true);
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 5000); // Changed from 2000 to 5000 (5 seconds)
+          // Continue with spinner and retry (will succeed on attempt 3)
+          retryTimerRef.current = setTimeout(() => performRetry(3), 3000);
+        }
+      } else {
+        // Failure mode flow
+        if (attemptNumber === 1) {
+          // First failure: silent retry (just spinner, no notification, 2.5 seconds - 50% reduction)
+          setRetryCount(1);
+          retryTimerRef.current = setTimeout(() => performRetry(2), 2500);
+        } else if (attemptNumber === 2) {
+          // Second failure: show sliding notification
+          setRetryCount(2);
+          setShowNotification(true);
+          // Auto-hide notification after 5 seconds
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 5000); // Changed from 2000 to 5000 (5 seconds)
+          // Continue with spinner and retry after 3 seconds
+          retryTimerRef.current = setTimeout(() => performRetry(3), 3000);
+        } else if (attemptNumber === 3) {
+          // Third failure: show notification again
+          setRetryCount(3);
+          setShowNotification(true);
+          notificationTimerRef.current = setTimeout(() => {
+            setShowNotification(false);
+          }, 5000); // Changed from 2000 to 5000 (5 seconds)
+          // Show persistent error after 3 retries
+          retryTimerRef.current = setTimeout(() => {
+            setIsProcessing(false);
+            setShowPersistentError(true);
+            setShowError(false);
+            setIsNextDisabled(true);
+            setRetryCount(0);
+            // Store flag in localStorage for cache detection after refresh
+            localStorage.setItem('checkoutHadPersistentError', 'true');
 
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+            // Auto-scroll to error message
+            setTimeout(() => {
+              if (errorRef.current) {
+                errorRef.current.scrollIntoView({ 
+                  behavior: 'smooth', 
+                  block: 'center' 
+                });
+              }
+            }, 100);
+          }, 3000);
+        }
       }
     };
-  }, [inputQuantity, quantity, lastAttemptedQuantity, errorRef]);
 
-  // Handle input change - updates input value immediately (no processing)
-  const handleQuantityChange = (value: number | string | undefined) => {
-    setInputQuantity(value || 10);
+    // Start retry mechanism - for success mode, start with 2.5s wait (attempt 0)
+    if (demoMode === 'success') {
+      performRetry(0);
+    } else {
+      performRetry(1);
+    }
   };
 
   const handleRefresh = () => {
@@ -774,6 +1123,58 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
 
   return (
     <Box>
+      {/* Notification - Sliding message from bottom-right */}
+      {showNotification && (
+        <Box style={{ 
+          position: 'fixed', 
+          bottom: '220px', // Moved up by 5cm (200px) from 20px
+          right: '20px', 
+          zIndex: 1000,
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <Notification
+            icon={<IconAlertTriangle size={18} />}
+            color="orange"
+            title="Adobe API Slowness"
+            onClose={() => setShowNotification(false)}
+            withCloseButton
+            styles={{
+              root: {
+                minWidth: '400px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            Experiencing slowness from Adobe APIs. Retrying the operation to fetch latest prices.
+          </Notification>
+        </Box>
+      )}
+
+      {/* Demo Mode Toggle */}
+      <Box mb="md" style={{ 
+        position: 'sticky', 
+        top: '20px', 
+        zIndex: 100,
+        backgroundColor: 'white',
+        padding: '12px',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb',
+        marginBottom: '16px'
+      }}>
+        <Group justify="space-between" align="center">
+          <Text size="sm" fw={500}>Demo Mode:</Text>
+          <SegmentedControl
+            value={demoMode}
+            onChange={(value) => setDemoMode(value as 'success' | 'failure')}
+            data={[
+              { label: 'Success Flow', value: 'success' },
+              { label: 'Failure Flow', value: 'failure' }
+            ]}
+            size="sm"
+          />
+        </Group>
+      </Box>
+
       {/* Top Header Bar */}
       <Box style={{ 
         backgroundColor: '#3c3c3c', 
@@ -811,27 +1212,27 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
         <Alert 
           ref={errorRef}
           icon={<IconCheck size={16} />} 
-          title="Quantity Updated Successfully" 
+          title="Price Updated Successfully" 
           color="green"
           mb="md"
         >
           <Text size="sm">
-            Your quantity has been successfully updated to {quantity} users. The pricing has been recalculated.
+            Prices have been successfully updated for {quantity} users. The pricing has been recalculated with latest discounts.
           </Text>
         </Alert>
       )}
 
-      {/* Error Message */}
-      {showError && (
+      {/* Persistent Error Message */}
+      {showPersistentError && (
         <Alert 
           ref={errorRef}
           icon={<IconAlertTriangle size={16} />} 
-          title="System Slowness Detected" 
-          color="orange"
+          title="Unable to Fetch Latest Prices" 
+          color="red"
           mb="md"
         >
           <Text size="sm" mb="sm">
-            We're experiencing slowness from downstream systems. Your changes may not have been saved properly.
+            We are experiencing slowness to get latest pricing from Adobe. All retry attempts have been exhausted. Please refresh the page after few minutes to view the latest price.
           </Text>
           <Button 
             leftSection={<IconRefresh size={16} />} 
@@ -886,8 +1287,9 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
                 <Group align="center" gap="md">
                   <Text size="sm" fw={500}>Total Users</Text>
                   <NumberInput
-                    value={inputQuantity}
-                    onChange={handleQuantityChange}
+                    value={quantity}
+                    onChange={(value) => setQuantity(typeof value === 'number' ? value : 1)}
+                    onBlur={handleQuantityBlur}
                     min={1}
                     size="sm"
                     style={{ width: 100 }}
@@ -899,13 +1301,21 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
               {/* Pricing Information */}
               <Box>
                 <Stack gap="xs">
+                  {showSuccess && (
+                    <Group gap="xs" align="center">
+                      <Text size="sm" td="line-through" c="dimmed">${originalUnitPrice.toFixed(2)} / User / year</Text>
+                    </Group>
+                  )}
                   <Group gap="xs" align="center">
-                    <Text size="sm" td="line-through" c="dimmed">$10.00 / User / year</Text>
-                  </Group>
-                  <Group gap="xs" align="center">
-                    <Text size="sm" fw={600} c="#0891b2">$7.50 / User / year</Text>
-                    <IconBolt size={16} color="#0891b2" />
-                    <Text size="sm" c="#0891b2">3-year Commit pricing applied</Text>
+                    {showSuccess ? (
+                      <Group gap="xs" align="center">
+                        <Text size="sm" fw={600} c="#0891b2">${discountedUnitPrice.toFixed(2)} / User / year</Text>
+                        <IconBolt size={16} color="#0891b2" />
+                        <Text size="sm" c="#0891b2">3-year Commit pricing applied</Text>
+                      </Group>
+                    ) : (
+                      <Text size="sm" fw={600} c="dimmed">${discountedUnitPrice.toFixed(2)} / User / year</Text>
+                    )}
                   </Group>
                 </Stack>
               </Box>
@@ -934,7 +1344,7 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
                   </Stack>
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm" c="dimmed">{quantity} Users (yearly)</Text>
+                  <Text size="sm" c="dimmed">{displayQuantity} Users (yearly)</Text>
                   <Text size="sm" fw={500}>${yearlyPrice.toFixed(2)}</Text>
                 </Group>
               </Paper>
