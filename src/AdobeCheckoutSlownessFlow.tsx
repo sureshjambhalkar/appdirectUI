@@ -358,20 +358,20 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
           // Second failure: show sliding notification
           setRetryCount(2);
           setShowNotification(true);
-          // Auto-hide notification after 2 seconds
+          // Auto-hide notification after 7 seconds (enough time to read)
           notificationTimerRef.current = setTimeout(() => {
             setShowNotification(false);
-          }, 2000);
-          // Continue with spinner and retry after 3 seconds
-          retryTimerRef.current = setTimeout(() => performRetry(3), 3000);
+          }, 7000);
+          // Continue with spinner and retry after 7 seconds (matches notification display time)
+          retryTimerRef.current = setTimeout(() => performRetry(3), 7000);
         } else if (attemptNumber === 3) {
           // Third failure: show notification again
           setRetryCount(3);
           setShowNotification(true);
           notificationTimerRef.current = setTimeout(() => {
             setShowNotification(false);
-          }, 5000); // Changed from 2000 to 5000 (5 seconds)
-          // Show persistent error after 3 retries
+          }, 7000); // 7 seconds to allow users to read the message
+          // Show persistent error after 3 retries (after notification has been visible)
           retryTimerRef.current = setTimeout(() => {
             setIsSaving(false);
             setIsProcessing(false);
@@ -390,7 +390,7 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
                 });
               }
             }, 100);
-          }, 3000);
+          }, 7000); // Match notification display time
         }
       }
     };
@@ -421,17 +421,24 @@ const QuotesPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> }>
           <Notification
             icon={<IconAlertTriangle size={18} />}
             color="orange"
-            title="Adobe API Slowness"
+            title={<Text fw={700}>Waiting for Adobe Response</Text>}
             onClose={() => setShowNotification(false)}
             withCloseButton
             styles={{
               root: {
                 minWidth: '400px',
+                maxWidth: '500px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              },
+              body: {
+                wordWrap: 'break-word',
+                whiteSpace: 'normal'
               }
             }}
           >
-            Experiencing slowness from Adobe APIs. Retrying the operation to fetch latest prices.
+            <Text size="sm" style={{ wordWrap: 'break-word', whiteSpace: 'normal', lineHeight: 1.5 }}>
+              We're waiting for a response from Adobe's systems. It's taking a little longer than usual, but your request is still in progress. We'll retry automatically and update you once it's ready.
+            </Text>
           </Notification>
         </Box>
       )}
@@ -1072,20 +1079,20 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
           // Second failure: show sliding notification
           setRetryCount(2);
           setShowNotification(true);
-          // Auto-hide notification after 5 seconds
+          // Auto-hide notification after 7 seconds (enough time to read)
           notificationTimerRef.current = setTimeout(() => {
             setShowNotification(false);
-          }, 5000); // Changed from 2000 to 5000 (5 seconds)
-          // Continue with spinner and retry after 3 seconds
-          retryTimerRef.current = setTimeout(() => performRetry(3), 3000);
+          }, 7000);
+          // Continue with spinner and retry after 7 seconds (matches notification display time)
+          retryTimerRef.current = setTimeout(() => performRetry(3), 7000);
         } else if (attemptNumber === 3) {
           // Third failure: show notification again
           setRetryCount(3);
           setShowNotification(true);
           notificationTimerRef.current = setTimeout(() => {
             setShowNotification(false);
-          }, 5000); // Changed from 2000 to 5000 (5 seconds)
-          // Show persistent error after 3 retries
+          }, 7000); // 7 seconds to allow users to read the message
+          // Show persistent error after 3 retries (after notification has been visible)
           retryTimerRef.current = setTimeout(() => {
             setIsProcessing(false);
             setShowPersistentError(true);
@@ -1104,7 +1111,7 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
                 });
               }
             }, 100);
-          }, 3000);
+          }, 7000); // Match notification display time
         }
       }
     };
@@ -1135,17 +1142,24 @@ const CheckoutPageContent: React.FC<{ errorRef: React.RefObject<HTMLDivElement> 
           <Notification
             icon={<IconAlertTriangle size={18} />}
             color="orange"
-            title="Adobe API Slowness"
+            title={<Text fw={700}>Waiting for Adobe Response</Text>}
             onClose={() => setShowNotification(false)}
             withCloseButton
             styles={{
               root: {
                 minWidth: '400px',
+                maxWidth: '500px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              },
+              body: {
+                wordWrap: 'break-word',
+                whiteSpace: 'normal'
               }
             }}
           >
-            Experiencing slowness from Adobe APIs. Retrying the operation to fetch latest prices.
+            <Text size="sm" style={{ wordWrap: 'break-word', whiteSpace: 'normal', lineHeight: 1.5 }}>
+              We're waiting for a response from Adobe's systems. It's taking a little longer than usual, but your request is still in progress. We'll retry automatically and update you once it's ready.
+            </Text>
           </Notification>
         </Box>
       )}
