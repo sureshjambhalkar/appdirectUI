@@ -29,6 +29,7 @@ import {
   IconCheck
 } from '@tabler/icons-react';
 import AdditionalInfoModal from './AdditionalInfoModal';
+import AdobeActionCenterPage from './pages/AdobeActionCenterPage';
 
 interface CompanyDetailPageProps {
   companyId: string;
@@ -38,6 +39,7 @@ interface CompanyDetailPageProps {
 const CompanyDetailPage = ({ companyId, onBack }: CompanyDetailPageProps) => {
   const [activeTab, setActiveTab] = useState('vendor-information');
   const [selectedVendor, setSelectedVendor] = useState('Adobe');
+  const [vendorSubView, setVendorSubView] = useState<'profile' | 'action-center'>('profile');
   const [modalOpened, setModalOpened] = useState(false);
   const [hasVendorProfile, setHasVendorProfile] = useState(false);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
@@ -99,85 +101,11 @@ const CompanyDetailPage = ({ companyId, onBack }: CompanyDetailPageProps) => {
   };
 
   const renderVendorInformation = () => {
-    if (!hasVendorProfile) {
-      return (
-        <Box>
-          {/* Vendor Selection */}
-          <Group mb="lg" justify="space-between">
-            <Text fw={500} size="sm" c="#374151">Select Vendor</Text>
-          </Group>
-          
-          <Select
-            data={[
-              { value: 'Microsoft', label: 'Microsoft' },
-              { value: 'Adobe', label: 'Adobe ✓' },
-              { value: 'Salesforce', label: 'Salesforce' },
-              { value: 'Oracle', label: 'Oracle' }
-            ]}
-            value={selectedVendor}
-            onChange={(value) => setSelectedVendor(value || 'Adobe')}
-            placeholder="Select vendor"
-            mb="xl"
-            bg="#f5f5f5"
-            styles={{
-              input: { backgroundColor: '#f5f5f5' }
-            }}
-          />
-
-          {/* Adobe Empty State */}
-          {selectedVendor === 'Adobe' && (
-            <Center p="xl">
-              <Stack align="center" gap="lg">
-                <Box
-                  bg="#e53e3e"
-                  c="white"
-                  p="lg"
-                  style={{ 
-                    borderRadius: '8px',
-                    fontSize: '24px',
-                    fontWeight: 700,
-                    width: '60px',
-                    height: '60px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  A
-                </Box>
-                <Text fw={600} size="lg" c="#374151" ta="center">
-                  There is no Adobe company profile linked to this account.
-                </Text>
-                <Button 
-                  variant="outline" 
-                  color="gray"
-                  onClick={() => setModalOpened(true)}
-                  styles={{
-                    root: {
-                      '&:hover': {
-                        backgroundColor: '#f3f4f6',
-                        borderColor: '#9ca3af'
-                      }
-                    }
-                  }}
-                >
-                  Add Additional Information
-                </Button>
-              </Stack>
-            </Center>
-          )}
-        </Box>
-      );
-    }
-
-    // Vendor Profile Card (after form submission)
     return (
       <Box>
-        {/* Vendor Selection */}
         <Group mb="lg" justify="space-between">
           <Text fw={500} size="sm" c="#374151">Select Vendor</Text>
         </Group>
-        
         <Select
           data={[
             { value: 'Microsoft', label: 'Microsoft' },
@@ -186,111 +114,164 @@ const CompanyDetailPage = ({ companyId, onBack }: CompanyDetailPageProps) => {
             { value: 'Oracle', label: 'Oracle' }
           ]}
           value={selectedVendor}
-          onChange={(value) => setSelectedVendor(value || 'Adobe')}
+          onChange={(value) => { setSelectedVendor(value || 'Adobe'); setVendorSubView('profile'); }}
           placeholder="Select vendor"
-          mb="xl"
+          mb="md"
           bg="#f5f5f5"
-          styles={{
-            input: { backgroundColor: '#f5f5f5' }
-          }}
+          styles={{ input: { backgroundColor: '#f5f5f5' } }}
         />
 
-        {/* Populated Vendor Profile */}
         {selectedVendor === 'Adobe' && (
-          <Paper withBorder p="lg" radius="md">
-            <Group justify="space-between" mb="md">
-              <Group>
-                <Box
-                  bg="#e53e3e"
-                  c="white"
-                  p="sm"
-                  style={{ 
-                    borderRadius: '4px',
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  A
-                </Box>
-                <Box>
-                  <Text fw={600} size="lg" c="#374151">Cypress Dietrich - Labadie</Text>
-                  <Text size="sm" c="#6b7280">P1005214392</Text>
-                </Box>
-              </Group>
-              <Menu shadow="md" width={200}>
-                <Menu.Target>
-                  <ActionIcon variant="subtle" color="gray">
-                    <IconDots size={16} />
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Item leftSection={<IconRefresh size={16} />}>
-                    Refresh
-                  </Menu.Item>
-                  <Menu.Item 
-                    leftSection={<IconEdit size={16} />}
-                    onClick={handleUpdateProfile}
-                  >
-                    Update company profile
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-            </Group>
+          <>
+            <Tabs value={vendorSubView} onChange={(v) => setVendorSubView((v as 'profile' | 'action-center') || 'profile')} color="#0891b2" mb="md">
+              <Tabs.List style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <Tabs.Tab value="profile" fw={500}>Adobe profile</Tabs.Tab>
+                <Tabs.Tab value="action-center" fw={500}>Adobe Action Center</Tabs.Tab>
+              </Tabs.List>
+              <Tabs.Panel value="action-center" pt="md">
+                <AdobeActionCenterPage
+                  managerView={false}
+                  companyId={company.companyId}
+                  breadcrumbParent="Company Settings"
+                  hideInfoBanner
+                />
+              </Tabs.Panel>
+              <Tabs.Panel value="profile" pt="md">
+                {!hasVendorProfile ? (
+                  <Center p="xl">
+                    <Stack align="center" gap="lg">
+                      <Box
+                        bg="#e53e3e"
+                        c="white"
+                        p="lg"
+                        style={{
+                          borderRadius: '8px',
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          width: '60px',
+                          height: '60px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        A
+                      </Box>
+                      <Text fw={600} size="lg" c="#374151" ta="center">
+                        There is no Adobe company profile linked to this account.
+                      </Text>
+                      <Button
+                        variant="outline"
+                        color="gray"
+                        onClick={() => setModalOpened(true)}
+                        styles={{
+                          root: {
+                            '&:hover': {
+                              backgroundColor: '#f3f4f6',
+                              borderColor: '#9ca3af'
+                            }
+                          }
+                        }}
+                      >
+                        Add Additional Information
+                      </Button>
+                    </Stack>
+                  </Center>
+                ) : (
+                  <Paper withBorder p="lg" radius="md">
+                    <Group justify="space-between" mb="md">
+                      <Group>
+                        <Box
+                          bg="#e53e3e"
+                          c="white"
+                          p="sm"
+                          style={{
+                            borderRadius: '4px',
+                            fontSize: '18px',
+                            fontWeight: 700,
+                            width: '40px',
+                            height: '40px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          A
+                        </Box>
+                        <Box>
+                          <Text fw={600} size="lg" c="#374151">Cypress Dietrich - Labadie</Text>
+                          <Text size="sm" c="#6b7280">P1005214392</Text>
+                        </Box>
+                      </Group>
+                      <Menu shadow="md" width={200}>
+                        <Menu.Target>
+                          <ActionIcon variant="subtle" color="gray">
+                            <IconDots size={16} />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Item leftSection={<IconRefresh size={16} />}>Refresh</Menu.Item>
+                          <Menu.Item leftSection={<IconEdit size={16} />} onClick={handleUpdateProfile}>
+                            Update company profile
+                          </Menu.Item>
+                        </Menu.Dropdown>
+                      </Menu>
+                    </Group>
+                    <SimpleGrid cols={2} spacing="lg">
+                      <Box>
+                        <Text size="sm" c="#6b7280" mb="xs">Address</Text>
+                        <Text size="sm" c="#374151">50 GROVE ST.</Text>
+                        <Text size="sm" c="#374151">Somerville, MA 02114</Text>
+                        <Text size="sm" c="#374151">US</Text>
+                      </Box>
+                      <Box>
+                        <Text size="sm" c="#6b7280" mb="xs">Contact</Text>
+                        <Text size="sm" c="#374151">Phone: (555) 123-4567</Text>
+                        <Text size="sm" c="#374151">Email: contact@cypress.com</Text>
+                      </Box>
+                      <Box>
+                        <Text size="sm" c="#6b7280" mb="xs">Current discount levels - licenses</Text>
+                        <Text size="sm" fw={500} c="#374151">Level 01</Text>
+                      </Box>
+                      <Box>
+                        <Text size="sm" c="#6b7280" mb="xs">Current discount levels - consumables</Text>
+                        <Text size="sm" fw={500} c="#374151">Tier T1</Text>
+                      </Box>
+                      <Box>
+                        <Text size="sm" c="#6b7280" mb="xs">Market segment</Text>
+                        <Text size="sm" fw={500} c="#374151">Government</Text>
+                      </Box>
+                      <Box>
+                        <Text size="sm" c="#6b7280" mb="xs">Type</Text>
+                        <Text size="sm" fw={500} c="#374151">Commercial</Text>
+                      </Box>
+                    </SimpleGrid>
+                    <Paper withBorder p="md" radius="sm" mt="lg" bg="#f8f9fa">
+                      <Text fw={600} mb="md" c="#374151">Administrator Contact Information</Text>
+                      <SimpleGrid cols={3}>
+                        <Box>
+                          <Text size="xs" fw={700} c="#374151">Administrator name</Text>
+                          <Text size="sm" c="#374151">adsasd asdasd</Text>
+                        </Box>
+                        <Box>
+                          <Text size="xs" fw={700} c="#374151">Email ID</Text>
+                          <Text size="sm" c="#374151">asdasd@as.com</Text>
+                        </Box>
+                        <Box>
+                          <Text size="xs" fw={700} c="#374151">Phone number</Text>
+                          <Text size="sm" c="#374151">2132423456</Text>
+                        </Box>
+                      </SimpleGrid>
+                    </Paper>
+                  </Paper>
+                )}
+              </Tabs.Panel>
+            </Tabs>
+          </>
+        )}
 
-            <SimpleGrid cols={2} spacing="lg">
-              <Box>
-                <Text size="sm" c="#6b7280" mb="xs">Address</Text>
-                <Text size="sm" c="#374151">50 GROVE ST.</Text>
-                <Text size="sm" c="#374151">Somerville, MA 02114</Text>
-                <Text size="sm" c="#374151">US</Text>
-              </Box>
-              <Box>
-                <Text size="sm" c="#6b7280" mb="xs">Contact</Text>
-                <Text size="sm" c="#374151">Phone: (555) 123-4567</Text>
-                <Text size="sm" c="#374151">Email: contact@cypress.com</Text>
-              </Box>
-              <Box>
-                <Text size="sm" c="#6b7280" mb="xs">Current discount levels - licenses</Text>
-                <Text size="sm" fw={500} c="#374151">Level 01</Text>
-              </Box>
-              <Box>
-                <Text size="sm" c="#6b7280" mb="xs">Current discount levels - consumables</Text>
-                <Text size="sm" fw={500} c="#374151">Tier T1</Text>
-              </Box>
-              <Box>
-                <Text size="sm" c="#6b7280" mb="xs">Market segment</Text>
-                <Text size="sm" fw={500} c="#374151">Government</Text>
-              </Box>
-              <Box>
-                <Text size="sm" c="#6b7280" mb="xs">Type</Text>
-                <Text size="sm" fw={500} c="#374151">Commercial</Text>
-              </Box>
-            </SimpleGrid>
-
-            {/* Administrator Information */}
-            <Paper withBorder p="md" radius="sm" mt="lg" bg="#f8f9fa">
-              <Text fw={600} mb="md" c="#374151">Administrator Contact Information</Text>
-              <SimpleGrid cols={3}>
-                <Box>
-                  <Text size="xs" fw={700} c="#374151">Administrator name</Text>
-                  <Text size="sm" c="#374151">adsasd asdasd</Text>
-                </Box>
-                <Box>
-                  <Text size="xs" fw={700} c="#374151">Email ID</Text>
-                  <Text size="sm" c="#374151">asdasd@as.com</Text>
-                </Box>
-                <Box>
-                  <Text size="xs" fw={700} c="#374151">Phone number</Text>
-                  <Text size="sm" c="#374151">2132423456</Text>
-                </Box>
-              </SimpleGrid>
-            </Paper>
-          </Paper>
+        {selectedVendor !== 'Adobe' && (
+          <Text size="sm" c="#6b7280">Select Adobe to view profile and action center.</Text>
         )}
       </Box>
     );

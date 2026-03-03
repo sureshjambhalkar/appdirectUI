@@ -12,6 +12,7 @@ import AdobeVIPMPMigrationsFlow from './AdobeVIPMPMigrationsFlow';
 import AdobeCheckoutSlownessFlow from './AdobeCheckoutSlownessFlow';
 import MidTermUpgradesFlow from './MidTermUpgradesFlow';
 import AdminFlow from './AdminFlow';
+import AdobeActionCenterFlow from './AdobeActionCenterFlow';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/lga-flow/*" element={<LGAFlow />} />
         <Route path="/company-flow/*" element={<CompanyFlow />} />
+        <Route path="/adobe-action-center/*" element={<AdobeActionCenterFlow />} />
         <Route path="/adobesyncui/*" element={<AdobeSyncUIFlow />} />
         <Route path="/appinsights-ai/*" element={<AppInsightsAIFlow />} />
         <Route path="/adobe-recommendations/*" element={<AdobeRecommendationsFlow />} />

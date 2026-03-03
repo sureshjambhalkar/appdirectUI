@@ -55,6 +55,11 @@ const LandingPage: React.FC = () => {
       id: 'mid-term-upgrades',
       demo: 'Mid Term - Revert Order',
       color: '#8b5cf6' // Purple - upgrades theme
+    },
+    {
+      id: 'adobe-action-center',
+      demo: 'Adobe Action Center',
+      color: '#dc2626' // Adobe red – action center for managers & customers
     }
   ];
 
