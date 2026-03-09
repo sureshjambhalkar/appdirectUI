@@ -1,4 +1,4 @@
-# EPIC: High Growth Offers (HGO) – Move from Eligibility-Based to Request-Based Flow
+# EPIC: High Growth Offers (HGO) – Request-Based Experience
 
 **Document version:** 1.0  
 **Created:** March 2026  
@@ -11,123 +11,134 @@
 
 | Field | Description |
 |-------|-------------|
-| **Epic title** | HGO: Request-based flow (replace eligibility check) |
+| **Epic title** | HGO: Request-based experience (replace eligibility check) |
 | **Epic owner** | [Product owner] |
-| **Stakeholders** | Adobe Partnership, Marketplace PM, Engineering |
+| **Stakeholders** | Adobe Partnership, Marketplace Product, Sales & Channel |
 | **Target release** | [Release version] |
 
-**One-line summary:** Replace the current “check eligibility → show eligible products” HGO flow with a direct “Request for HGO” flow. Users request HGO by selecting Offer Type (MOQ 100 / 250 / 500) and Schedule (Mid Term / Renewal) in a single tile, without an upfront eligibility check, aligning with Adobe API behavior that accepts MOQ for all customers at subscription creation.
+**In one sentence:** We are changing how resellers request High Growth Offers (HGO): instead of checking eligibility first and often seeing an error, they will use a single “Request for HGO” action, choose their offer size (MOQ 100, 250, or 500) and schedule (Mid Term or Renewal), and submit the request—so more valid customers can access HGO without being blocked.
 
 ---
 
-## 2. Problem statement
+## 2. Business problem
 
-- **Current behavior:** The product uses an **eligibility-based** HGO flow: the user clicks “Check Eligible Offers,” we call Adobe APIs to determine eligibility, then show eligible products (e.g. two product tiles) for which HGO can be requested.
-- **Issue:** For customers **without an existing Adobe Acrobat subscription**, Adobe’s APIs do **not** return an eligibility response. The platform therefore shows an **ineligible error** to these users even though they are valid candidates for HGO.
-- **Adobe behavior:** Adobe’s subscription-creation APIs **do accept** High Growth Offer (MOQ) parameters for **all customers**. Eligibility is not a prerequisite for submitting an HGO request at creation time.
-- **Impact:** Valid customers are blocked from requesting HGO due to a pre-check that does not match Adobe’s actual API contract, leading to a poor experience and lost HGO adoption.
+**What we do today**  
+Resellers use a “Check Eligible Offers” step before requesting HGO. The system then shows which products are eligible. For many customers—especially those who do not yet have an Adobe Acrobat subscription—this step returns an “ineligible” message and blocks them from going further.
 
----
+**Why this is a problem**  
+Adobe allows HGO (High Growth Offers) to be requested for all customers when creating a subscription. Our current flow does not match that: we block valid customers based on an eligibility check that often fails for new or non-Acrobat customers. That leads to:
 
-## 3. Goals and success criteria
+- **Lost opportunities:** Resellers cannot request HGO for customers who are actually allowed to have it.
+- **Confusion:** “Ineligible” messages when the customer could have been approved.
+- **Friction:** Extra steps (check eligibility, then choose from multiple product tiles) instead of a direct request.
 
-| Goal | Success criteria |
-|------|-------------------|
-| Remove dependency on eligibility for HGO | No “check eligibility” step; no ineligible error for customers without Acrobat based solely on missing eligibility response. |
-| Align UX with Adobe API capabilities | HGO can be requested for any customer for whom we support subscription creation (subject to business rules, e.g. 3YC). |
-| Simplify HGO request UX | Single request path: one tile with Offer Type + Schedule, then submit. |
-| Maintain 3YC requirement | Enrollment in HGO still requires 3YC participation; messaging and validation preserved. |
+**What we want**  
+A straightforward “Request for HGO” experience: one place to choose offer type and schedule, then submit—no upfront eligibility check that blocks valid customers.
 
 ---
 
-## 4. User stories
+## 3. Goals and success
 
-### 4.1 Primary user stories
-
-- **US-1** As a **reseller / company admin**, I want to see a **“Request for HGO”** action (instead of “Check Eligible Offers”) on the High Growth Offers (HGO) program card so that I can request HGO without being blocked by an eligibility check that fails for customers without Acrobat.
-- **US-2** As a **reseller / company admin**, I want to open a **single request form** (one tile) where I can choose **Offer Type** (MOQ 100, MOQ 250, MOQ 500) and **Schedule** (Mid Term or Renewal) so that I can submit an HGO request in one place without selecting from multiple product-specific tiles.
-- **US-3** As a **reseller / company admin**, I want to see a clear message that **enrollment in HGO requires 3YC participation** so that I understand the prerequisite before requesting HGO.
-- **US-4** As a **reseller / company admin**, I want to **submit** my HGO request (Apply for HGO) and receive confirmation (or clear error) so that I know the outcome without hitting an ineligible error for valid customers.
-
-### 4.2 Supporting user stories
-
-- **US-5** As a **platform**, we want to **stop calling** the Adobe eligibility endpoint for HGO when the customer has no Acrobat subscription, so that we do not surface incorrect “ineligible” states.
-- **US-6** As a **product owner**, I want the HGO request payload to use **Offer Type (MOQ)** and **Schedule** so that backend and Adobe integration can create the subscription with the correct MOQ and schedule parameters.
+| Goal | What success looks like |
+|------|---------------------------|
+| **Remove the blocking “ineligible” experience** | Customers without an existing Acrobat subscription are no longer shown an ineligible error when they are valid for HGO. |
+| **Simplify how resellers request HGO** | One clear path: “Request for HGO” → choose offer type and schedule → submit. No “check eligibility” step, no multiple product tiles. |
+| **Keep 3YC as the business rule** | We still require 3YC participation for HGO; that rule and its messaging stay in place. |
+| **Grow HGO adoption** | More resellers can complete HGO requests for more customers, in line with what Adobe supports. |
 
 ---
 
-## 5. Acceptance criteria
+## 4. User stories (business language)
 
-### 5.1 VIP Programs – HGO card
+### For resellers and company admins
 
-| ID | Criterion | Verification |
-|----|-----------|--------------|
-| AC-1 | The HGO program card displays the button label **“Request for HGO”** (not “Check Eligible Offers” or “Check Eligible Offers”). | UI review on all surfaces where the HGO card appears (e.g. Create Customer, Update Customer, Customer Details, any recommendations/summary views). |
-| AC-2 | The card still shows **“Find out more”** and supporting copy (e.g. that 3YC is required for HGO). | UI review. |
-| AC-3 | Clicking **“Request for HGO”** opens the HGO request flow (modal or dedicated view). | Click-through test. |
+- **US-1** As a reseller, I want to see a **“Request for HGO”** option (instead of “Check Eligible Offers”) so that I can request HGO for my customers without being blocked by an ineligible message when the customer doesn’t already have Acrobat.
 
-### 5.2 HGO request flow – single tile
+- **US-2** As a reseller, I want **one simple form** where I choose **Offer Type** (MOQ 100, 250, or 500) and **Schedule** (Mid Term or Renewal) so that I can submit an HGO request in one place, without picking from multiple product-specific options.
 
-| ID | Criterion | Verification |
-|----|-----------|--------------|
-| AC-4 | The flow shows **one** request tile (no multiple product-specific tiles for HGO). | UI review. |
-| AC-5 | The flow shows an **informational banner** stating that enrollment in High Growth Offers requires participation in the 3YC program. | UI review. |
-| AC-6 | **Offer type** is a single selector with options: **MOQ 100**, **MOQ 250**, **MOQ 500**. | UI + test with each option. |
-| AC-7 | **Schedule** is a single selector with options: **Mid Term**, **Renewal**. | UI + test with each option. |
-| AC-8 | Primary action is **“Apply for HGO”**; secondary action is **“Cancel”**. | UI review; Cancel closes without submitting. |
-| AC-9 | **“Apply for HGO”** is enabled only when both Offer Type and Schedule are selected. | Test with empty/partial selection. |
-| AC-10 | On submit, the selected **Offer Type (MOQ)** and **Schedule** are sent to the backend/Adobe integration (no eligibility call required before this). | Integration/API test. |
+- **US-3** As a reseller, I want to see a clear message that **HGO requires 3YC participation** so that I know the requirement before I request HGO.
 
-### 5.3 Behavior and errors
+- **US-4** As a reseller, I want to **submit** my HGO request and get a clear confirmation or error so that I know the outcome without hitting an ineligible error for customers who are valid for HGO.
 
-| ID | Criterion | Verification |
-|----|-----------|--------------|
-| AC-11 | Customers **without** an existing Adobe Acrobat subscription are **not** shown an “ineligible” error when using “Request for HGO” (no eligibility pre-check). | Test with customer that has no Acrobat subscription. |
-| AC-12 | Business validation (e.g. 3YC requirement) is still enforced where applicable; errors are clear and actionable. | Test with non-3YC customer if 3YC is required. |
-| AC-13 | After successful submission, the user sees a clear success state and the flow closes (or navigates as designed). | E2E test. |
+### For the business and product
 
----
+- **US-5** As a product owner, I want the experience to **no longer depend on an eligibility check** that fails for customers without Acrobat, so that we align with Adobe’s support for HGO for all customers at subscription creation.
 
-## 6. Out of scope (for this epic)
+- **US-6** As a product owner, I want the request to capture **Offer Type (MOQ)** and **Schedule** so that the right offer and timing are sent to Adobe and reflected in the subscription.
 
-- Changing 3YC enrollment or validation rules.
-- Changing Adobe subscription creation API contracts beyond passing MOQ and schedule for HGO.
-- Redesign of the 3YC card or other VIP program cards (only HGO card and HGO flow in scope).
-- Backend implementation details (this epic focuses on product/UX scope; implementation will be covered in technical design and stories).
+### Additional user stories (requested state, edit, cancel, notifications)
+
+- **US-7** As a reseller, after I submit an HGO request, I want to see a **“Requested HGO”** status (not a product name) with the **offer type** (e.g. MOQ 100) and **schedule** (e.g. Mid-Term) clearly shown so that I can confirm what was requested at a glance.
+
+- **US-8** As a reseller, I want to **edit** an existing HGO request so that I can change the offer type (MOQ 100, 250, or 500) or schedule (Mid-Term or Renewal) without starting over.
+
+- **US-9** As a reseller, when I am editing an HGO request, I want **“Update HGO”** to be enabled only when I have changed the offer type or schedule from the current values so that I do not submit unnecessary updates.
+
+- **US-10** As a reseller, I want to **cancel** an HGO request so that I can remove the request and return to the state where I can request HGO again, with a clear confirmation that the request was cancelled.
+
+- **US-11** As a reseller, I want to see a **success notification** when my HGO request is applied, when I update an HGO, or when I cancel an HGO request so that I know each action completed successfully.
+
+- **US-12** As a reseller, I want to see a **clear error notification** when an HGO action (request, update, or cancel) fails so that I know what went wrong and can try again or get help.
 
 ---
 
-## 7. Technical notes (for implementation stories)
+## 5. What we will deliver (acceptance criteria)
 
-- **Frontend:** Replace “Check Eligible Offers” with “Request for HGO”; remove any UI that depends on an HGO eligibility API response for showing/blocking the flow. Implement a single-tile form: Offer Type (MOQ 100 / 250 / 500), Schedule (Mid Term / Renewal), Apply for HGO, Cancel.
-- **Integration:** Use Adobe subscription creation (or equivalent) APIs that accept MOQ (HGO) and schedule; do not rely on eligibility APIs for customers without Acrobat to gate the request.
-- **APIs:** Identify exact Adobe API parameters for MOQ (e.g. 100, 250, 500) and schedule (Mid Term vs Renewal) and document in technical spec.
-- **Conditional options:** Offer Type and Schedule options may be conditional on segment/region in the future; for this epic, the fixed sets above are sufficient.
+### 5.1 HGO entry point (VIP Programs card)
+
+- The HGO program card shows the button **“Request for HGO”** (not “Check Eligible Offers”) everywhere the card appears.
+- The card still includes **“Find out more”** and copy that 3YC is required for HGO.
+- Clicking **“Request for HGO”** opens the HGO request experience (e.g. modal or dedicated screen).
+
+### 5.2 HGO request experience (single form)
+
+- The experience shows **one form** (one “tile”), not multiple product-specific tiles.
+- A short **informational message** states that enrollment in High Growth Offers requires participation in the 3YC program.
+- **Offer type** can be chosen from: **MOQ 100**, **MOQ 250**, **MOQ 500**.
+- **Schedule** can be chosen from: **Mid Term**, **Renewal**.
+- The main action is **“Apply for HGO”**; there is a **“Cancel”** option that closes without submitting.
+- **“Apply for HGO”** is only available when both Offer Type and Schedule are selected.
+- When the user submits, the chosen **Offer Type** and **Schedule** are what we use for the HGO request (no eligibility check required before this).
+
+### 5.3 Behavior and messaging
+
+- Customers **without** an existing Adobe Acrobat subscription are **not** shown an “ineligible” error when using “Request for HGO”; we do not block them based on that check.
+- We still enforce business rules (e.g. 3YC) where they apply, and show clear, actionable messages if something is missing.
+- After a successful submission, the user sees a clear success message and the flow closes or moves on as designed.
 
 ---
 
-## 8. Dependencies and risks
+## 6. Out of scope for this epic
 
-| Dependency / risk | Mitigation |
-|-------------------|------------|
-| Adobe API contract for MOQ and schedule | Confirm with Adobe documentation and partnership; document in technical spec. |
-| Backend support for request-based HGO | Backend must accept and forward MOQ + schedule to Adobe; align with backend epic/stories. |
-| Existing “eligible products” or multi-tile HGO screens | Deprecate or refactor to the single-tile request flow; update all entry points (e.g. Create/Update Customer, Customer Details, recommendations). |
+- Changes to how 3YC enrollment or validation works.
+- Changes to other VIP program cards (only the HGO card and HGO request flow are in scope).
+- Redesign of the 3YC card.
+- Detailed technical or backend design (those stay in technical specs and implementation stories).
 
 ---
 
-## 9. Definition of done (epic level)
+## 7. Dependencies and risks (business view)
 
-- [ ] All acceptance criteria AC-1 through AC-13 verified.
+| Dependency or risk | How we address it |
+|--------------------|--------------------|
+| **Adobe’s position on HGO** | Confirm with Adobe that HGO (MOQ 100 / 250 / 500) and schedule (Mid Term / Renewal) are supported for all customers at subscription creation; document agreement. |
+| **Backend and Adobe handoff** | Ensure the backend can receive Offer Type and Schedule from the new flow and pass them correctly to Adobe. |
+| **Existing “eligible products” / multi-tile flows** | Replace or retire those with the new single-form “Request for HGO” experience and update all entry points (e.g. Create/Update Customer, Customer Details, recommendations). |
+
+---
+
+## 8. Definition of done (epic level)
+
 - [ ] “Request for HGO” is the only HGO entry action on the card (no “Check Eligible Offers”).
-- [ ] Single-tile HGO request form is live with Offer Type (MOQ 100/250/500) and Schedule (Mid Term/Renewal).
-- [ ] No eligibility-based blocking for customers without Acrobat; request is submitted with MOQ and schedule.
-- [ ] Documentation and release notes updated; stakeholders sign-off.
+- [ ] The HGO request experience is a single form with Offer Type (MOQ 100 / 250 / 500) and Schedule (Mid Term / Renewal).
+- [ ] Customers without an existing Acrobat subscription are no longer blocked by an ineligible message when requesting HGO.
+- [ ] 3YC requirement and messaging are still present and enforced where applicable.
+- [ ] Stakeholders have signed off; release notes and user-facing documentation are updated.
 
 ---
 
-## 10. References
+## 9. References (for context)
 
-- Current UX: VIP Programs section with 3YC and HGO cards; HGO flow with (current) eligibility check and multi-product tiles.
-- Target UX: Same section; HGO card with “Request for HGO” opening a single-tile form (Offer Type + Schedule).
-- Adobe: Subscription creation APIs accepting MOQ (High Growth Offers) for all customers.
+- **Current experience:** VIP Programs section with 3YC and HGO cards; HGO uses “Check Eligible Offers” and then shows multiple product tiles.
+- **Target experience:** Same section; HGO card with “Request for HGO” opening a single form (Offer Type + Schedule).
+- **Adobe:** HGO (MOQ) can be requested for all customers at subscription creation; we are aligning our experience with this.

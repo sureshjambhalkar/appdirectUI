@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Paper, Title, Text, Group, Box, SimpleGrid, Button, Anchor, Divider, Stack, Center, ActionIcon } from '@mantine/core';
 import { IconDots } from '@tabler/icons-react';
 import LinkedMembershipPage from '../LinkedMembershipPage';
-import HGORequestModal from '../components/HGORequestModal';
+import HGOSection from '../components/HGOSection';
 
 const CustomerHeader = () => (
   <Paper withBorder p="lg" radius="md">
@@ -120,7 +120,7 @@ const ProgramCard = ({ title, findOutMore, children, ctaText, onCtaClick }: { ti
                 {findOutMore && <Anchor href="#" size="sm">Find out more</Anchor>}
             </Box>
             <Box style={{textAlign: 'center'}}>{children}</Box>
-            <Button type="button" variant="outline" color="gray" onClick={onCtaClick}>{ctaText}</Button>
+            <Button type="button" variant="filled" onClick={onCtaClick} style={{ backgroundColor: '#0891b2' }}>{ctaText}</Button>
         </Stack>
     </Paper>
 );
@@ -180,7 +180,6 @@ interface CustomerDetailsPageProps {
 }
 
 const UpdateCustomerDetailsPage = ({ hideVipPrograms = false }: CustomerDetailsPageProps) => {
-  const [hgoModalOpened, setHgoModalOpened] = useState(false);
   return (
     <Box>
         <CustomerHeader />
@@ -190,16 +189,12 @@ const UpdateCustomerDetailsPage = ({ hideVipPrograms = false }: CustomerDetailsP
         <Box style={{ display: hideVipPrograms ? 'none' : 'block' }}>
           <Title order={3} my="xl">Value Incentive Plan (VIP) Programs</Title>
           <SimpleGrid cols={2} spacing="xl">
-              <ProgramCard title="3-Year Commit (3YC)" ctaText="Apply for 3YC" findOutMore>
-                  <Box />
-              </ProgramCard>
-              <ProgramCard title="High Growth Offers (HGO)" ctaText="Request for HGO" findOutMore onCtaClick={() => setHgoModalOpened(true)}>
-                   <Text size="xs" c="dimmed">Enrollment in HGO requires participation in the 3YC program.</Text>
-              </ProgramCard>
+            <ProgramCard title="3-Year Commit (3YC)" ctaText="Apply for 3YC" findOutMore>
+              <Box />
+            </ProgramCard>
+            <HGOSection />
           </SimpleGrid>
         </Box>
-
-        <HGORequestModal opened={hgoModalOpened} onClose={() => setHgoModalOpened(false)} />
         
         <Box style={{gridColumn: '1 / span 2'}} mt="xl">
             <LinkedMembershipPage/>

@@ -31,7 +31,7 @@ import {
   Image
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import HGORequestModal from './components/HGORequestModal';
+import HGOSection from './components/HGOSection';
 import { 
   IconGridDots, 
   IconBell, 
@@ -1086,7 +1086,6 @@ const ProductDetailsPage = () => {
 
 const CompanyManagementPage = () => {
   const navigate = useNavigate();
-  const [hgoModalOpened, setHgoModalOpened] = useState(false);
 
   return (
     <Box style={{ backgroundColor: 'white', minHeight: '100vh' }}>
@@ -1336,16 +1335,10 @@ const CompanyManagementPage = () => {
                     <Stack gap="md" align="center">
                       <Title order={5}>3-Year Commit (3YC)</Title>
                       <Anchor size="sm" c="blue">Find out more</Anchor>
-                      <Button variant="outline" size="sm" style={{ width: 'auto' }}>Apply for 3YC</Button>
+                      <Button variant="filled" size="sm" style={{ width: 'auto', backgroundColor: '#0891b2' }}>Apply for 3YC</Button>
                     </Stack>
                   </Paper>
-                  <Paper withBorder p="md" style={{ textAlign: 'center' }}>
-                    <Stack gap="md" align="center">
-                      <Title order={5}>High Growth Offers (HGO)</Title>
-                      <Anchor size="sm" c="blue">Find out more</Anchor>
-                      <Button type="button" variant="outline" size="sm" style={{ width: 'auto' }} onClick={() => setHgoModalOpened(true)}>Request for HGO</Button>
-                    </Stack>
-                  </Paper>
+                  <HGOSection />
                 </SimpleGrid>
               </Stack>
 
@@ -1385,7 +1378,6 @@ const CompanyManagementPage = () => {
           </Box>
         </Stack>
       </Container>
-      <HGORequestModal opened={hgoModalOpened} onClose={() => setHgoModalOpened(false)} />
     </Box>
   );
 };

@@ -20,7 +20,7 @@ const OFFER_TYPES = [
 ];
 
 const SCHEDULE_OPTIONS = [
-  { value: 'mid-term', label: 'Mid Term' },
+  { value: 'mid-term', label: 'Mid-Term' },
   { value: 'renewal', label: 'Renewal' },
 ];
 
@@ -53,7 +53,7 @@ export default function HGORequestModal({ opened, onClose, onApply }: HGORequest
     <Modal
       opened={opened}
       onClose={handleClose}
-      title="Request for High Growth Offers (HGO)"
+      title="Apply for High Growth Offers (HGO)"
       size="md"
     >
       <Stack gap="lg">
@@ -92,7 +92,7 @@ export default function HGORequestModal({ opened, onClose, onApply }: HGORequest
         </Paper>
 
         <Group justify="flex-start" gap="sm">
-          <Button color="#0891b2" onClick={handleApply} disabled={!offerType || !schedule}>
+          <Button variant="filled" style={{ backgroundColor: '#0891b2' }} onClick={handleApply} disabled={!offerType || !schedule}>
             Apply for HGO
           </Button>
           <Button variant="outline" color="gray" onClick={handleClose}>
