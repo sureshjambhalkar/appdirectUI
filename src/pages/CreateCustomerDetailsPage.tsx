@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Paper, Title, Text, Group, Box, SimpleGrid, Button, Anchor, Divider, Stack, Center, ActionIcon } from '@mantine/core';
 import { IconDots } from '@tabler/icons-react';
 import LinkedMembershipPage from '../LinkedMembershipPage';
+import HGORequestModal from '../components/HGORequestModal';
 
 const CustomerHeader = () => (
   <Paper withBorder p="lg" radius="md">
@@ -99,7 +100,7 @@ const CustomerInfo = () => {
   );
 };
 
-const ProgramCard = ({ title, findOutMore, children, ctaText }: { title: string, findOutMore?: boolean, ctaText: string, children: React.ReactNode }) => (
+const ProgramCard = ({ title, findOutMore, children, ctaText, onCtaClick }: { title: string, findOutMore?: boolean, ctaText: string, children: React.ReactNode, onCtaClick?: () => void }) => (
     <Paper withBorder p="lg" radius="md" style={{ height: '220px' }}>
         <Stack justify="space-between" h="100%">
             <Box style={{textAlign: 'center'}}>
@@ -107,7 +108,7 @@ const ProgramCard = ({ title, findOutMore, children, ctaText }: { title: string,
                 {findOutMore && <Anchor href="#" size="sm">Find out more</Anchor>}
             </Box>
             <Box style={{textAlign: 'center'}}>{children}</Box>
-            <Button variant="outline" color="gray">{ctaText}</Button>
+            <Button type="button" variant="outline" color="gray" onClick={onCtaClick}>{ctaText}</Button>
         </Stack>
     </Paper>
 );
@@ -167,6 +168,7 @@ interface CustomerDetailsPageProps {
 }
 
 const CreateCustomerDetailsPage = ({ hideVipPrograms = false }: CustomerDetailsPageProps) => {
+  const [hgoModalOpened, setHgoModalOpened] = useState(false);
   return (
     <Box>
         <CustomerHeader />
@@ -179,11 +181,13 @@ const CreateCustomerDetailsPage = ({ hideVipPrograms = false }: CustomerDetailsP
               <ProgramCard title="3-Year Commit (3YC)" ctaText="Apply for 3YC" findOutMore>
                   <Box />
               </ProgramCard>
-              <ProgramCard title="High Growth Offers (HGO)" ctaText="Check Eligible Offers" findOutMore>
-                   <Text size="xs" c="dimmed">3YC is required before making a purchase.</Text>
+              <ProgramCard title="High Growth Offers (HGO)" ctaText="Request for HGO" findOutMore onCtaClick={() => setHgoModalOpened(true)}>
+                   <Text size="xs" c="dimmed">Enrollment in HGO requires participation in the 3YC program.</Text>
               </ProgramCard>
           </SimpleGrid>
         </Box>
+
+        <HGORequestModal opened={hgoModalOpened} onClose={() => setHgoModalOpened(false)} />
         
         <Box style={{gridColumn: '1 / span 2'}} mt="xl">
             <LinkedMembershipPage/>

@@ -31,6 +31,7 @@ import {
   Image
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import HGORequestModal from './components/HGORequestModal';
 import { 
   IconGridDots, 
   IconBell, 
@@ -1085,7 +1086,8 @@ const ProductDetailsPage = () => {
 
 const CompanyManagementPage = () => {
   const navigate = useNavigate();
-  
+  const [hgoModalOpened, setHgoModalOpened] = useState(false);
+
   return (
     <Box style={{ backgroundColor: 'white', minHeight: '100vh' }}>
       <Container size="xl" py="md">
@@ -1341,7 +1343,7 @@ const CompanyManagementPage = () => {
                     <Stack gap="md" align="center">
                       <Title order={5}>High Growth Offers (HGO)</Title>
                       <Anchor size="sm" c="blue">Find out more</Anchor>
-                      <Button variant="outline" size="sm" style={{ width: 'auto' }}>Check Eligible Offers</Button>
+                      <Button type="button" variant="outline" size="sm" style={{ width: 'auto' }} onClick={() => setHgoModalOpened(true)}>Request for HGO</Button>
                     </Stack>
                   </Paper>
                 </SimpleGrid>
@@ -1383,6 +1385,7 @@ const CompanyManagementPage = () => {
           </Box>
         </Stack>
       </Container>
+      <HGORequestModal opened={hgoModalOpened} onClose={() => setHgoModalOpened(false)} />
     </Box>
   );
 };
